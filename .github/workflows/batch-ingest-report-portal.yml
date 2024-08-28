@@ -1,0 +1,39 @@
+name: Batch ingest JUnit XML reports from Cloud Storage
+
+on:
+    workflow_dispatch:
+
+jobs:
+    ingest_reports:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Authenticate with Google Cloud
+              uses: google-github-actions/auth@v0.5.0
+              with:
+                credentials_json: ${{ secrets.GCP_SA_KEY }}
+            - name: Set up Google Cloud SDK
+              uses: 'google-github-actions/setup-gcloud@v2.1.1'
+              with:
+                project_id: ${{ secrets.GCP_PROJECT_ID }}
+            - name: Find and download FullJunitXmlReport.xml files from the last 24 hours
+              run: |
+                BUCKET_NAME="${{ secrets.GCS_BUCKET_NAME }}"
+                TIMESTAMP=$(date -d '24 hours ago' --utc +%Y-%m-%dT%H:%M:%SZ)
+
+                gsutil ls gs://$BUCKET_NAME/** | while read -r line; do
+                  if [[ $line == *FullJunitXmlReport.xml* ]]; then
+                    FILE_TIMESTAMP=$(gsutil ls -l $line | awk '{print $2}' | sed 's/T.*//')
+                    if [[ "$FILE_TIMESTAMP" > "$TIMESTAMP" ]]; then
+                      gsutil cp "$line" ./
+                    fi
+                  fi
+                done
+            - name: Archive the reports into a zip file
+              run: |
+                ZIP_FILE="FullJunitXmlReports_$(date +%Y%m%d_%H%M%S).zip"
+                zip -r $ZIP_FILE *.xml
+            - name: Upload artifact
+              uses: actions/upload-artifact@v4.3.6
+              with:
+                  name: junit-xml-reports
+                  path: $ZIP_FILE
