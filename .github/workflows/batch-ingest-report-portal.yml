@@ -18,22 +18,26 @@ jobs:
             - name: Find and download FullJunitXmlReport.xml files from the last 24 hours
               run: |
                 BUCKET_NAME="${{ secrets.GCS_BUCKET_NAME }}"
-                TIMESTAMP=$(date -d '24 hours ago' --utc +%Y-%m-%dT%H:%M:%SZ)
+                DATE_PREFIX=$(date -u +%Y-%m-%d)  # Get the current date in UTC
 
-                gsutil ls gs://$BUCKET_NAME/** | while read -r line; do
-                  if [[ $line == *FullJunitXmlReport.xml* ]]; then
-                    FILE_TIMESTAMP=$(gsutil ls -l $line | awk '{print $2}' | sed 's/T.*//')
-                    if [[ "$FILE_TIMESTAMP" > "$TIMESTAMP" ]]; then
-                      gsutil cp "$line" ./
-                    fi
-                  fi
+                mkdir -p junit_reports
+
+                # Find and download the FullJunitXmlReport.xml files from the last 24 hours
+                gsutil ls "gs://$BUCKET_NAME/*$DATE_PREFIX*/FullJUnitReport.xml" | while read -r file; do
+                  # Extract directory name from the full path
+                  DIR_NAME=$(basename $(dirname "$file"))
+                  # Define the destination file name with the directory name appended
+                  DEST_FILE="./junit_reports/FullJUnitReport-${DIR_NAME}.xml"
+                  # Copy the file with the new name to avoid overwriting
+                  gsutil -m cp "$file" "$DEST_FILE"
                 done
             - name: Archive the reports into a zip file
               run: |
                 ZIP_FILE="FullJunitXmlReports_$(date +%Y%m%d_%H%M%S).zip"
-                zip -r $ZIP_FILE *.xml
+                zip -r $ZIP_FILE junit_reports/
+                echo "ZIP_FILE=$ZIP_FILE" >> $GITHUB_ENV
             - name: Upload artifact
               uses: actions/upload-artifact@v4.3.6
               with:
                   name: junit-xml-reports
-                  path: $ZIP_FILE
+                  path: ${{ env.ZIP_FILE }}
