@@ -1,12 +1,19 @@
-name: Batch ingest JUnit XML reports from Cloud Storage
+name: Batch ingest JUnit XML reports from Cloud Storage to ReportPortal
 
 on:
     workflow_dispatch:
+
+env:
+   API_TOKEN: ${{ secrets.REPORT_PORTAL_API_TOKEN }}
+   API_ENDPOINT: ${{ secrets.REPORT_PORTAL_API_ENDPOINT }}
+   PROJECT_NAME: ${{ secrets.REPORT_PORTAL_PROJECT_NAME }}
 
 jobs:
     ingest_reports:
         runs-on: ubuntu-latest
         steps:
+            - name: Checkout the repository
+              uses: actions/checkout@v4.1.7
             - name: Authenticate with Google Cloud
               uses: google-github-actions/auth@v0.5.0
               with:
@@ -15,6 +22,9 @@ jobs:
               uses: 'google-github-actions/setup-gcloud@v2.1.1'
               with:
                 project_id: ${{ secrets.GCP_PROJECT_ID }}
+            - name: Install junitparser
+              run: |
+                python3 -m pip install junitparser==3.1.2
             - name: Find and download FullJunitXmlReport.xml files from the last 24 hours
               run: |
                 BUCKET_NAME="${{ secrets.GCS_BUCKET_NAME }}"
@@ -31,11 +41,19 @@ jobs:
                   # Copy the file with the new name to avoid overwriting
                   gsutil -m cp "$file" "$DEST_FILE"
                 done
+            - name: Inspect and remove empty JUnit XML reports
+              run: |
+                python3 scripts/inspect_reports.py junit_reports
+
             - name: Archive the reports into a zip file
               run: |
                 ZIP_FILE="FullJunitXmlReports_$(date +%Y%m%d_%H%M%S).zip"
                 zip -r $ZIP_FILE junit_reports/
                 echo "ZIP_FILE=$ZIP_FILE" >> $GITHUB_ENV
+            - name: Run ingestion script
+              run: |
+               cd scripts/src
+               ./ingest_reports.sh
             - name: Upload artifact
               uses: actions/upload-artifact@v4.3.6
               with:
