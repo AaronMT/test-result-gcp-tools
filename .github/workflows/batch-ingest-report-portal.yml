@@ -43,8 +43,7 @@ jobs:
                 done
             - name: Inspect and remove empty JUnit XML reports
               run: |
-                python3 scripts/inspect_reports.py junit_reports
-
+                python3 scripts/src/inspect_reports.py junit_reports
             - name: Archive the reports into a zip file
               run: |
                 ZIP_FILE="FullJunitXmlReports_$(date +%Y%m%d_%H%M%S).zip"
@@ -53,7 +52,6 @@ jobs:
             - name: Run ingestion script
               run: |
                cd scripts/src
-               ./ingest_reports.sh
             - name: Upload artifact
               uses: actions/upload-artifact@v4.3.6
               with:
