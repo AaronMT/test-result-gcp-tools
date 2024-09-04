@@ -4,9 +4,9 @@ on:
     workflow_dispatch:
 
 env:
-   API_TOKEN: ${{ secrets.REPORT_PORTAL_API_TOKEN }}
-   API_ENDPOINT: ${{ secrets.REPORT_PORTAL_API_ENDPOINT }}
-   PROJECT_NAME: ${{ secrets.REPORT_PORTAL_PROJECT_NAME }}
+   REPORT_PORTAL_API_ENDPOINT: ${{ secrets.REPORT_PORTAL_API_ENDPOINT }}
+   REPORT_PORTAL_PROJECT_NAME: ${{ secrets.REPORT_PORTAL_PROJECT_NAME }}
+   REPORT_PORTAL_API_TOKEN: ${{ secrets.REPORT_PORTAL_API_TOKEN }}
 
 jobs:
     ingest_reports:
@@ -51,7 +51,7 @@ jobs:
                 echo "ZIP_FILE=$ZIP_FILE" >> $GITHUB_ENV
             - name: Run ingestion script
               run: |
-               cd scripts/src
+                  ./scripts/src/ingest_reports.sh
             - name: Upload artifact
               uses: actions/upload-artifact@v4.3.6
               with:
