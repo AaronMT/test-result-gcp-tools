@@ -22,10 +22,10 @@ jobs:
               uses: 'google-github-actions/setup-gcloud@v2.1.1'
               with:
                 project_id: ${{ secrets.GCP_PROJECT_ID }}
-            - name: Install junitparser
+            - name: Install Dependencies
               run: |
                 python3 -m pip install junitparser==3.1.2
-            - name: Find and download FullJunitXmlReport.xml files from the last 24 hours
+            - name: Copy JUnit reports from the last 24 hours from GCS
               run: |
                 BUCKET_NAME="${{ secrets.GCS_BUCKET_NAME }}"
                 DATE_PREFIX=$(date -u +%Y-%m-%d)  # Get the current date in UTC
@@ -38,7 +38,21 @@ jobs:
                   DIR_NAME=$(basename $(dirname "$file"))
                   # Define the destination file name with the directory name appended
                   DEST_FILE="./junit_reports/FullJUnitReport-${DIR_NAME}.xml"
+                  # Matrix file path
+                  MATRIX_FILE="$(dirname "$file")/matrix_ids.json"
+                  LOCAL_MATRIX_FILE="./junit_reports/matrix_ids-${DIR_NAME}.json"
+                  # Copy matrix_ids.json locally to inspect it
+                  gsutil cp "$MATRIX_FILE" "$LOCAL_MATRIX_FILE"
+
+                  if [ -f "$LOCAL_MATRIX_FILE" ]; then
+                    MATRIX_LABEL=$(jq -r '.[].clientDetails.matrixLabel' "$LOCAL_MATRIX_FILE")
+                    if [ "$MATRIX_LABEL" == "try" ]; then
+                      echo "Skipping $file because matrixLabel is 'try'"
+                      continue
+                    fi
+                  fi
                   # Copy the file with the new name to avoid overwriting
+                  echo "Copying $file to $DEST_FILE"
                   gsutil -m cp "$file" "$DEST_FILE"
                 done
             - name: Inspect and remove empty JUnit XML reports
@@ -53,7 +67,7 @@ jobs:
               run: |
                   ./scripts/src/ingest_reports.sh
             - name: Upload artifact
-              uses: actions/upload-artifact@v4.3.6
+              uses: actions/upload-artifact@v4.4.0
               with:
                   name: junit-xml-reports
                   path: ${{ env.ZIP_FILE }}
