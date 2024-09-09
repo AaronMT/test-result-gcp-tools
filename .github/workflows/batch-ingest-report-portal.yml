@@ -5,12 +5,20 @@ on:
 
 env:
    REPORT_PORTAL_API_ENDPOINT: ${{ secrets.REPORT_PORTAL_API_ENDPOINT }}
-   REPORT_PORTAL_PROJECT_NAME: ${{ secrets.REPORT_PORTAL_PROJECT_NAME }}
    REPORT_PORTAL_API_TOKEN: ${{ secrets.REPORT_PORTAL_API_TOKEN }}
 
 jobs:
     ingest_reports:
         runs-on: ubuntu-latest
+        strategy:
+          matrix:
+              project:
+                  - name: "Fenix"
+                    bucket_name: "GCS_BUCKET_NAME_A"
+                    report_portal_project_name: "REPORT_PORTAL_PROJECT_NAME_A"
+                  - name: "Focus"
+                    bucket_name: "GCS_BUCKET_NAME_B"
+                    report_portal_project_name: "REPORT_PORTAL_PROJECT_NAME_B"
         steps:
             - name: Checkout the repository
               uses: actions/checkout@v4.1.7
@@ -27,7 +35,7 @@ jobs:
                 python3 -m pip install junitparser==3.1.2
             - name: Copy JUnit reports from the last 24 hours from GCS
               run: |
-                BUCKET_NAME="${{ secrets.GCS_BUCKET_NAME }}"
+                BUCKET_NAME="${{ secrets[matrix.project.bucket_name] }}"
                 DATE_PREFIX=$(date -u +%Y-%m-%d)  # Get the current date in UTC
 
                 mkdir -p junit_reports
@@ -70,8 +78,12 @@ jobs:
             - name: Run ingestion script
               run: |
                   ./scripts/src/ingest_reports.sh
+              env:
+                REPORT_PORTAL_PROJECT_NAME: ${{ secrets[matrix.project.report_portal_project_name] }}
+                REPORT_PORTAL_API_ENDPOINT: ${{ secrets.REPORT_PORTAL_API_ENDPOINT }}
+                REPORT_PORTAL_API_TOKEN: ${{ secrets.REPORT_PORTAL_API_TOKEN }}
             - name: Upload artifact
               uses: actions/upload-artifact@v4.4.0
               with:
-                  name: junit-xml-reports
-                  path: ${{ env.ZIP_FILE }}
+                name: junit-xml-reports-${{ matrix.project.name }}
+                path: ${{ env.ZIP_FILE }}
