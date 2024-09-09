@@ -11,11 +11,11 @@ response=$(curl -v -L -X POST "http://$REPORT_PORTAL_API_ENDPOINT/api/v1/$REPORT
 -H "Content-Type: multipart/form-data" \
 -H "Authorization: Bearer $REPORT_PORTAL_API_TOKEN" \
 -F "file=@$ZIP_FILE;type=application/x-zip-compressed" \
--F 'launchImportRq={
-  "description": "Github Actions import: ARM64-v8a",
-  "mode": "DEFAULT",
-  "name": "Fenix ARM64-v8a"
-};type=application/json' 2>&1)
+-F "launchImportRq={
+  \"description\": \"Github Actions import: ARM64-v8a\",
+  \"mode\": \"DEFAULT\",
+  \"name\": \"$REPORT_PORTAL_PROJECT_NAME ARM64-v8a\"
+};type=application/json" 2>&1)
 
 status=$?
 
