@@ -41,19 +41,23 @@ jobs:
                   # Matrix file path
                   MATRIX_FILE="$(dirname "$file")/matrix_ids.json"
                   LOCAL_MATRIX_FILE="./junit_reports/matrix_ids-${DIR_NAME}.json"
-                  # Copy matrix_ids.json locally to inspect it
-                  gsutil cp "$MATRIX_FILE" "$LOCAL_MATRIX_FILE"
 
-                  if [ -f "$LOCAL_MATRIX_FILE" ]; then
-                    MATRIX_LABEL=$(jq -r '.[].clientDetails.matrixLabel' "$LOCAL_MATRIX_FILE")
-                    if [ "$MATRIX_LABEL" == "try" ]; then
-                      echo "Skipping $file because matrixLabel is 'try'"
-                      continue
+                  if gsutil cp "$MATRIX_FILE" "$LOCAL_MATRIX_FILE"; then
+                    echo "Inspecting $LOCAL_MATRIX_FILE"
+
+                    if [ -f "$LOCAL_MATRIX_FILE" ]; then
+                      MATRIX_LABEL=$(jq -r '.[].clientDetails.matrixLabel' "$LOCAL_MATRIX_FILE")
+                      if [ "$MATRIX_LABEL" == "try" ]; then
+                        echo "Skipping $file because matrixLabel is 'try'"
+                        continue
+                      fi
                     fi
+                  else
+                    echo "Warning: matrix_ids.json not found for $file, proceeding with copy"
                   fi
-                  # Copy the file with the new name to avoid overwriting
-                  echo "Copying $file to $DEST_FILE"
-                  gsutil -m cp "$file" "$DEST_FILE"
+
+                  # Copy the FullJUnitReport.xml file with the new name to avoid overwriting
+                  gsutil cp "$file" "$DEST_FILE"
                 done
             - name: Inspect and remove empty JUnit XML reports
               run: |
