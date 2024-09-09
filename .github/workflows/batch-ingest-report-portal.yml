@@ -46,7 +46,7 @@ jobs:
                     echo "Inspecting $LOCAL_MATRIX_FILE"
 
                     if [ -f "$LOCAL_MATRIX_FILE" ]; then
-                      MATRIX_LABEL=$(jq -r '.[].clientDetails.matrixLabel' "$LOCAL_MATRIX_FILE")
+                      MATRIX_LABEL=$(jq -r 'to_entries | map(select(.value.clientDetails.matrixLabel == "try")) | first | .value.clientDetails.matrixLabel' "$LOCAL_MATRIX_FILE")
                       if [ "$MATRIX_LABEL" == "try" ]; then
                         echo "Skipping $file because matrixLabel is 'try'"
                         continue
