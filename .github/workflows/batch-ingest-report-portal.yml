@@ -9,6 +9,7 @@ env:
 
 jobs:
     ingest_reports:
+        name: Ingest JUnit Reports for ${{ matrix.project.name }}
         runs-on: ubuntu-latest
         strategy:
           matrix:
