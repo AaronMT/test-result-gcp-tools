@@ -12,9 +12,9 @@ response=$(curl -v -L -X POST "http://$REPORT_PORTAL_API_ENDPOINT/api/v1/$REPORT
 -H "Authorization: Bearer $REPORT_PORTAL_API_TOKEN" \
 -F "file=@$ZIP_FILE;type=application/x-zip-compressed" \
 -F "launchImportRq={
-  \"description\": \"Github Actions import: ARM64-v8a\",
+  \"description\": \"Github Actions import: All Arch\",
   \"mode\": \"DEFAULT\",
-  \"name\": \"$REPORT_PORTAL_PROJECT_NAME ARM64-v8a\"
+  \"name\": \"$REPORT_PORTAL_PROJECT_NAME All Arch\"
 };type=application/json" 2>&1)
 
 status=$?
