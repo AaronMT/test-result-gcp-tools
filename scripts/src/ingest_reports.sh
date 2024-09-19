@@ -7,6 +7,7 @@ if [ ! -f "$ZIP_FILE" ]; then
 fi
 
 # Get the current date in the format YYYY-MM-DD
+# Can be used to append to the launch name
 CURRENT_DATE=$(date +%Y-%m-%d)
 
 # Execute the curl command and capture the output and exit status
@@ -17,7 +18,7 @@ response=$(curl -v -L -X POST "http://$REPORT_PORTAL_API_ENDPOINT/api/v1/$REPORT
 -F "launchImportRq={
   \"description\": \"GitHub Actions Import: All Architectures\",
   \"mode\": \"DEFAULT\",
-  \"name\": \"$REPORT_PORTAL_PROJECT_NAME for android ($CURRENT_DATE)\"
+  \"name\": \"$REPORT_PORTAL_PROJECT_NAME for android\"
 };type=application/json" 2>&1)
 
 status=$?
