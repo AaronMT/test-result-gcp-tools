@@ -3,7 +3,7 @@ name: Batch ingest JUnit XML reports from Cloud Storage to ReportPortal
 on:
     workflow_dispatch:
     schedule:
-        - cron: '0 4 * * *'  # Runs at 4:00 AM UTC every day
+        - cron: '0 5 * * *'  # Runs at 5:00 AM UTC every day
 
 env:
    REPORT_PORTAL_API_ENDPOINT: ${{ secrets.REPORT_PORTAL_API_ENDPOINT }}

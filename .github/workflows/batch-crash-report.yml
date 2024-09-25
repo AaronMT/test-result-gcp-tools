@@ -1,0 +1,92 @@
+name: Batch collect and manually process Android minidump crash reports from Cloud Storage
+
+on:
+   workflow_dispatch:
+
+jobs:
+    report_crashes:
+        name: Collect and manually process Android minidump crash reports for ${{ matrix.project.name }}
+        runs-on: ubuntu-latest
+        strategy:
+          matrix:
+              project:
+                  - name: "Fenix"
+                    bucket_name: "GCS_BUCKET_NAME_A"
+                  - name: "Focus"
+                    bucket_name: "GCS_BUCKET_NAME_B"
+        steps:
+            - name: Checkout the repository
+              uses: actions/checkout@v4.1.7
+            - name: Authenticate with Google Cloud
+              uses: google-github-actions/auth@v2.1.5
+              with:
+                credentials_json: ${{ secrets.GCP_SA_KEY }}
+            - name: Set up Google Cloud SDK
+              uses: google-github-actions/setup-gcloud@v2.1.1
+              with:
+                project_id: ${{ secrets.GCP_PROJECT_ID }}
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-toolchain@stable
+            - name: Install minidump-stackwalk
+              run: |
+                cargo install minidump-stackwalk
+            - name: Copy Android minidump crash reports from the last 24 hours from GCS
+              run: |
+                  BUCKET_NAME="${{ secrets[matrix.project.bucket_name] }}"
+                  DATE_PREFIX=$(date -u +%Y-%m-%d)  # Get the current date in UTC
+              
+                  mkdir -p crash_reports
+              
+                  # List all potential directories for the current date
+                  DIRS=$(gsutil ls "gs://$BUCKET_NAME/${DATE_PREFIX}*")
+              
+                  # Loop through each directory
+                  for DIR in $DIRS; do
+                    # Strip trailing slashes from directory path
+                    DIR=${DIR%/}
+              
+                    # Extract the unique identifier (timestamp) from the directory path
+                    TIMESTAMP=$(basename "$DIR")
+              
+                    # Initialize flag to check if both files exist
+                    BOTH_EXIST=false
+              
+                    # Check if matrix_ids.json exists
+                    if gsutil -q stat "${DIR}/matrix_ids.json"; then
+                      # List minidump files to check if any are present
+                      MINIDUMPS=$(gsutil ls "${DIR}/matrix_*/**/artifacts/sdcard/Android/data/org.mozilla.fenix.debug/minidumps/*.dmp" 2>/dev/null)
+
+                      if [ ! -z "$MINIDUMPS" ]; then
+                        BOTH_EXIST=true
+                      fi
+                    fi
+              
+                    if [ "$BOTH_EXIST" = true ]; then
+                      # Create a unique directory for this set
+                      SET_DIR="crash_reports/set_${TIMESTAMP}"
+                      mkdir -p "$SET_DIR"
+              
+                      # Copy matrix_ids.json into the unique directory
+                      gsutil cp "${DIR}/matrix_ids.json" "${SET_DIR}/matrix_ids_${TIMESTAMP}.json" || echo "matrix_ids.json not found in ${DIR}"
+              
+                      # Copy minidump files into the unique directory
+                      for DUMP in $MINIDUMPS; do
+                        gsutil cp $DUMP "$SET_DIR/"
+                      done
+                    else
+                      echo "No minidump files or matrix_ids.json found in ${DIR}"
+                    fi
+                  done
+
+            - name: Archive the reports into a zip file
+              run: |
+                ZIP_FILE="crash_reports_$(date +%Y%m%d_%H%M%S).zip"
+                zip -r $ZIP_FILE crash_reports/
+                echo "ZIP_FILE=$ZIP_FILE" >> $GITHUB_ENV
+            - name: Upload artifact
+              uses: actions/upload-artifact@v4.4.0
+              with:
+                name: crash-reports-${{ matrix.project.name }}
+                path: ${{ env.ZIP_FILE }}
+
+
