@@ -55,7 +55,7 @@ jobs:
                 path: ${{ env.ZIP_FILE }}
                 retention-days: 1
     process_minidumps:
-        name: Process Android minidump crash reportts
+        name: Process Android minidump crash reports
         runs-on: ubuntu-latest
         needs: download_minidumps
         steps:
@@ -67,7 +67,7 @@ jobs:
               run: |
                 cargo install minidump-stackwalk
             - name: Download crash reports artifact
-              uses: actions/download-artifact@v3
+              uses: actions/download-artifact@v4.1.8
               with:
                 path: crash_reports
               continue-on-error: true
