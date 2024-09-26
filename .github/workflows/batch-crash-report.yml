@@ -1,11 +1,11 @@
-name: Batch collect and manually process Android minidump crash reports from Cloud Storage
+name: Batch process Android minidump crash reports on Cloud Storage from Firebase Test Lab
 
 on:
    workflow_dispatch:
 
 jobs:
-    report_crashes:
-        name: Collect and manually process Android minidump crash reports for ${{ matrix.project.name }}
+    download_minidumps:
+        name: Batch process Android minidump crash reports for ${{ matrix.project.name }}
         runs-on: ubuntu-latest
         strategy:
           matrix:
@@ -25,68 +25,50 @@ jobs:
               uses: google-github-actions/setup-gcloud@v2.1.1
               with:
                 project_id: ${{ secrets.GCP_PROJECT_ID }}
+            - name: Copy Android minidump crash reports from the last 24 hours from GCS
+              env:
+                GCS_BUCKET_NAME: ${{ secrets[matrix.project.bucket_name] }}
+              run: |
+                chmod u+x ./scripts/src/gsutil_crash_batch.sh
+                ./scripts/src/gsutil_crash_batch.sh
+            - name: Check for crash reports
+              id: check_for_reports
+              run: |
+                  if [ -d "crash_reports" ] && [ "$(find crash_reports -type f | wc -l)" -gt 0 ]; then
+                    echo "Crash reports found."
+                    echo "has_reports=true" >> $GITHUB_OUTPUT
+                  else
+                    echo "No crash reports found."
+                    echo "has_reports=false" >> $GITHUB_OUTPUT
+                  fi
+            - name: Archive the reports into a zip file
+              if: steps.check_for_reports.outputs.has_reports == 'true'
+              run: |
+                  ZIP_FILE="crash_reports_${{ matrix.project.name }}_$(date +%Y%m%d_%H%M%S).zip"
+                  zip -r "$ZIP_FILE" crash_reports/
+                  echo "ZIP_FILE=$ZIP_FILE" >> $GITHUB_ENV
+            - name: Upload artifact
+              if: steps.check_for_reports.outputs.has_reports == 'true'
+              uses: actions/upload-artifact@v4.4.0
+              with:
+                name: crash-reports-${{ matrix.project.name }}
+                path: ${{ env.ZIP_FILE }}
+    process_minidumps:
+        name: Process Android minidump crash reports for ${{ matrix.project.name }}
+        runs-on: ubuntu-latest
+        needs: download_minidumps
+        strategy:
+          matrix:
+              project:
+                  - name: "Fenix"
+                    report_portal_project_name: "REPORT_PORTAL_PROJECT_NAME_A"
+                  - name: "Focus"
+                    report_portal_project_name: "REPORT_PORTAL_PROJECT_NAME_B"
+        steps:
+            - name: Checkout the repository
+              uses: actions/checkout@v4.1.7
             - name: Install Rust toolchain
               uses: dtolnay/rust-toolchain@stable
             - name: Install minidump-stackwalk
               run: |
                 cargo install minidump-stackwalk
-            - name: Copy Android minidump crash reports from the last 24 hours from GCS
-              run: |
-                  BUCKET_NAME="${{ secrets[matrix.project.bucket_name] }}"
-                  DATE_PREFIX=$(date -u +%Y-%m-%d)  # Get the current date in UTC
-              
-                  mkdir -p crash_reports
-              
-                  # List all potential directories for the current date
-                  DIRS=$(gsutil ls "gs://$BUCKET_NAME/${DATE_PREFIX}*")
-              
-                  # Loop through each directory
-                  for DIR in $DIRS; do
-                    # Strip trailing slashes from directory path
-                    DIR=${DIR%/}
-              
-                    # Extract the unique identifier (timestamp) from the directory path
-                    TIMESTAMP=$(basename "$DIR")
-              
-                    # Initialize flag to check if both files exist
-                    BOTH_EXIST=false
-              
-                    # Check if matrix_ids.json exists
-                    if gsutil -q stat "${DIR}/matrix_ids.json"; then
-                      # List minidump files to check if any are present
-                      MINIDUMPS=$(gsutil ls "${DIR}/matrix_*/**/artifacts/sdcard/Android/data/org.mozilla.fenix.debug/minidumps/*.dmp" 2>/dev/null)
-
-                      if [ ! -z "$MINIDUMPS" ]; then
-                        BOTH_EXIST=true
-                      fi
-                    fi
-              
-                    if [ "$BOTH_EXIST" = true ]; then
-                      # Create a unique directory for this set
-                      SET_DIR="crash_reports/set_${TIMESTAMP}"
-                      mkdir -p "$SET_DIR"
-              
-                      # Copy matrix_ids.json into the unique directory
-                      gsutil cp "${DIR}/matrix_ids.json" "${SET_DIR}/matrix_ids_${TIMESTAMP}.json" || echo "matrix_ids.json not found in ${DIR}"
-              
-                      # Copy minidump files into the unique directory
-                      for DUMP in $MINIDUMPS; do
-                        gsutil cp $DUMP "$SET_DIR/"
-                      done
-                    else
-                      echo "No minidump files or matrix_ids.json found in ${DIR}"
-                    fi
-                  done
-
-            - name: Archive the reports into a zip file
-              run: |
-                ZIP_FILE="crash_reports_$(date +%Y%m%d_%H%M%S).zip"
-                zip -r $ZIP_FILE crash_reports/
-                echo "ZIP_FILE=$ZIP_FILE" >> $GITHUB_ENV
-            - name: Upload artifact
-              uses: actions/upload-artifact@v4.4.0
-              with:
-                name: crash-reports-${{ matrix.project.name }}
-                path: ${{ env.ZIP_FILE }}
-
-
