@@ -88,7 +88,14 @@ jobs:
             - name: Process the crash reports
               working-directory: crash_reports_unzipped
               run: |
-                for project_dir in crash_reports_unzipped/*/; do
-                    echo "Processing crash reports for project: $(basename "$project_dir")"
-                    ls -al "$project_dir"
-                done
+                shopt -s nullglob  # Enable nullglob
+                project_dirs=(crash_reports_unzipped/*/)
+                if [ ${#project_dirs[@]} -gt 0 ]; then
+                    for project_dir in "${project_dirs[@]}"; do
+                        echo "Processing crash reports for project: $(basename "$project_dir")"
+                        ls -al "$project_dir"
+                    done
+                else
+                    echo "No projects found in crash_reports_unzipped."
+                    exit 0  # Exit gracefully if no projects are found
+                fi
