@@ -74,8 +74,10 @@ jobs:
             - name: Unzip crash reports
               run: |
                 if ls crash_reports/**/crash_reports_*.zip 1> /dev/null 2>&1; then
+                    mkdir -p crash_reports_unzipped
                     for zip_file in crash_reports/**/crash_reports_*.zip; do
-                        project_name=$(basename "$zip_file" | sed 's/crash_reports_\(.*\)_.*\.zip/\1/')
+                        project_name=$(basename "$zip_file" | cut -d'_' -f3)
+                        echo "Extracted project_name: $project_name"
                         echo "Unzipping $zip_file for project $project_name"
                         unzip "$zip_file" -d "crash_reports_unzipped/$project_name"
                     done
@@ -88,7 +90,5 @@ jobs:
               run: |
                 for project_dir in crash_reports_unzipped/*/; do
                     echo "Processing crash reports for project: $(basename "$project_dir")"
-                    cd "$project_dir"
-                    ls -al
-                    cd ../../
+                    ls -al "$project_dir"
                 done
