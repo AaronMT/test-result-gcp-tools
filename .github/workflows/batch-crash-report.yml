@@ -6,8 +6,6 @@ on:
 jobs:
     download_minidumps:
         name: Batch process Android minidump crash reports for ${{ matrix.project.name }}
-        outputs:
-            has_reports: ${{ steps.check_for_reports.outputs.has_reports }}
         runs-on: ubuntu-latest
         strategy:
           matrix:
@@ -60,12 +58,13 @@ jobs:
         name: Process Android minidump crash reports for ${{ matrix.project.name }}
         runs-on: ubuntu-latest
         needs: download_minidumps
-        if: needs.download_minidumps.outputs.has_reports == 'true'
         strategy:
           matrix:
               project:
                   - name: "Fenix"
+                    bucket_name: "GCS_BUCKET_NAME_A"
                   - name: "Focus"
+                    bucket_name: "GCS_BUCKET_NAME_B"
         steps:
             - name: Checkout the repository
               uses: actions/checkout@v4.1.7
@@ -79,10 +78,15 @@ jobs:
               with:
                 name: crash-reports-${{ matrix.project.name }}
                 path: crash_reports
-
+              continue-on-error: true
             - name: Unzip crash reports
               run: |
-                  unzip "crash_reports/crash_reports_${{ matrix.project.name }}_*.zip" -d crash_reports_unzipped
+                if ls crash_reports/crash_reports_${{ matrix.project.name }}_*.zip 1> /dev/null 2>&1; then
+                    unzip "crash_reports/crash_reports_${{ matrix.project.name }}_*.zip" -d crash_reports_unzipped
+                else
+                    echo "No crash reports zip file found for ${{ matrix.project.name }}"
+                    exit 0  # Exit gracefully if no zip file is found
+                fi
             - name: Process the crash reports
               working-directory: crash_reports_unzipped
               run: |
