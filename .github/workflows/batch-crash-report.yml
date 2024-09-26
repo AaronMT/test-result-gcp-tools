@@ -6,6 +6,8 @@ on:
 jobs:
     download_minidumps:
         name: Batch process Android minidump crash reports for ${{ matrix.project.name }}
+        outputs:
+            has_reports: ${{ steps.check_for_reports.outputs.has_reports }}
         runs-on: ubuntu-latest
         strategy:
           matrix:
@@ -25,7 +27,7 @@ jobs:
               uses: google-github-actions/setup-gcloud@v2.1.1
               with:
                 project_id: ${{ secrets.GCP_PROJECT_ID }}
-            - name: Copy Android minidump crash reports from the last 24 hours from GCS
+            - name: Download Android minidump crash reports from the last 24 hours from Google Cloud Storage
               env:
                 GCS_BUCKET_NAME: ${{ secrets[matrix.project.bucket_name] }}
               run: |
@@ -53,17 +55,17 @@ jobs:
               with:
                 name: crash-reports-${{ matrix.project.name }}
                 path: ${{ env.ZIP_FILE }}
+                retention-days: 1
     process_minidumps:
         name: Process Android minidump crash reports for ${{ matrix.project.name }}
         runs-on: ubuntu-latest
         needs: download_minidumps
+        if: needs.download_minidumps.outputs.has_reports == 'true'
         strategy:
           matrix:
               project:
                   - name: "Fenix"
-                    report_portal_project_name: "REPORT_PORTAL_PROJECT_NAME_A"
                   - name: "Focus"
-                    report_portal_project_name: "REPORT_PORTAL_PROJECT_NAME_B"
         steps:
             - name: Checkout the repository
               uses: actions/checkout@v4.1.7
@@ -72,3 +74,16 @@ jobs:
             - name: Install minidump-stackwalk
               run: |
                 cargo install minidump-stackwalk
+            - name: Download crash reports artifact
+              uses: actions/download-artifact@v3
+              with:
+                name: crash-reports-${{ matrix.project.name }}
+                path: crash_reports
+
+            - name: Unzip crash reports
+              run: |
+                  unzip "crash_reports/crash_reports_${{ matrix.project.name }}_*.zip" -d crash_reports_unzipped
+            - name: Process the crash reports
+              working-directory: crash_reports_unzipped
+              run: |
+                  ls -al
