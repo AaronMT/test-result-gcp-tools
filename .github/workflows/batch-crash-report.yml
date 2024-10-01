@@ -111,8 +111,31 @@ jobs:
                             fi
 
                             # Construct the symbols URL
-                            symbols_url="https://firefox-ci-tc.services.mozilla.com/index/gecko.v2.${matrixLabel}.revision.${geckoRev}.mobile.android-aarch64-opt/artifacts/public%2Fbuild%2Ftarget.crashreporter-symbols.zip"
+                            symbols_url="https://firefox-ci-tc.services.mozilla.com/api/index/v1/task/gecko.v2.${matrixLabel}.revision.${geckoRev}.mobile.android-aarch64-opt/artifacts/public%2Fbuild%2Ftarget.crashreporter-symbols.zip"
                             echo "Symbols URL: $symbols_url"
+
+                            # Create a temporary directory for symbols
+                            symbols_dir="$project_dir/symbols"
+                            mkdir -p "$symbols_dir"
+
+                            # Download the symbols
+                            echo "Downloading symbols..."
+                            wget -q -O "$project_dir/target.crashreporter-symbols.zip" "$symbols_url"
+
+                            if [ $? -ne 0 ]; then
+                                echo "Failed to download symbols from $symbols_url. Skipping..."
+                                continue
+                            fi
+
+                            # Unzip the symbols
+                            echo "Unzipping symbols..."
+                            unzip -q "$project_dir/target.crashreporter-symbols.zip" -d "$symbols_dir"
+
+                            if [ $? -ne 0 ]; then
+                                echo "Failed to unzip symbols. Skipping..."
+                                continue
+                            fi
+
                          else
                             echo "No matrix_ids.json found in $project_dir. Skipping..."
                         fi
