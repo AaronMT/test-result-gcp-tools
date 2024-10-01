@@ -136,6 +136,22 @@ jobs:
                                 continue
                             fi
 
+                            # Process the minidump crash reports
+                            for dmp_file in "$project_dir"/*.dmp; do
+                                if [ -f "$dmp_file" ]; then
+                                    echo "Processing minidump file: $dmp_file"
+                                    output_file="${dmp_file%.dmp}.txt"
+                                    minidump-stackwalk "$dmp_file" "$symbols_dir" --symbols-url https://symbols.mozilla.org --brief > "$output_file"
+                                    echo "Stackwalk output saved to $output_file"
+                                    cat "$output_file"
+                                else
+                                    echo "No minidump files found in $project_dir"
+                                fi
+                            done
+
+                            # Clean up symbols
+                            rm -rf "$symbols_dir" "$project_dir/target.crashreporter-symbols.zip"
+
                          else
                             echo "No matrix_ids.json found in $project_dir. Skipping..."
                         fi
