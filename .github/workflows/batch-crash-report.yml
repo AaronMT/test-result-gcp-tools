@@ -93,6 +93,29 @@ jobs:
                     for project_dir in "${project_dirs[@]}"; do
                         echo "Processing crash reports in: $project_dir"
                         ls -al "$project_dir"
+
+                        json_file="$project_dir/matrix_ids.json"
+                        if [ -f "$json_file" ]; then
+                            echo "Found matrix_ids.json: $json_file"
+
+                            # Extract geckoRev and matrixLabel using jq
+                            geckoRev=$(jq -r '.[].clientDetails.geckoRev' "$json_file")
+                            matrixLabel=$(jq -r '.[].clientDetails.matrixLabel' "$json_file")
+                            echo "Extracted geckoRev: $geckoRev"
+                            echo "Extracted matrixLabel: $matrixLabel"
+
+                            # Check if geckoRev and matrixLabel are not empty
+                            if [ -z "$geckoRev" ] || [ -z "$matrixLabel" ]; then
+                                echo "geckoRev or matrixLabel is empty. Skipping..."
+                                continue
+                            fi
+
+                            # Construct the symbols URL
+                            symbols_url="https://firefox-ci-tc.services.mozilla.com/index/gecko.v2.${matrixLabel}.revision.${geckoRev}.mobile.android-aarch64-opt/artifacts/public%2Fbuild%2Ftarget.crashreporter-symbols.zip"
+                            echo "Symbols URL: $symbols_url"
+                         else
+                            echo "No matrix_ids.json found in $project_dir. Skipping..."
+                        fi
                     done
                 else
                     echo "No projects found in crash_reports_unzipped."
