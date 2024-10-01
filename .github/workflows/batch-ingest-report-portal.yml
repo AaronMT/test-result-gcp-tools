@@ -39,7 +39,7 @@ jobs:
             - name: Copy JUnit reports from the last 24 hours from GCS
               run: |
                 BUCKET_NAME="${{ secrets[matrix.project.bucket_name] }}"
-                DATE_PREFIX=$(date -u +%Y-%m-%d)  # Get the current date in UTC
+                DATE_PREFIX=$(date -u -d 'yesterday' +%Y-%m-%d)  # Get the current date in UTC
 
                 mkdir -p junit_reports
 

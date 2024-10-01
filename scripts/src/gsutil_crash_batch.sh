@@ -8,7 +8,7 @@ fi
 
 # Set the date prefix to today's date
 date_prefix="2024-09-25"
-#date_prefix=$(date '+%Y-%m-%d')
+#date_prefix=$(date -u -d 'yesterday' +%Y-%m-%d)
 
 # Destination directory where files will be copied
 DEST_DIR="crash_reports"
