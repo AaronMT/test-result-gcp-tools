@@ -94,13 +94,13 @@ jobs:
                         echo "Processing crash reports in: $project_dir"
                         ls -al "$project_dir"
 
-                        json_file="$project_dir/matrix_ids.json"
-                        if [ -f "$json_file" ]; then
-                            echo "Found matrix_ids.json: $json_file"
+                        matrix_json_file="$project_dir/matrix_ids.json"
+                        if [ -f "$matrix_json_file" ]; then
+                            echo "Found matrix_ids.json: $matrix_json_file"
 
                             # Extract geckoRev and matrixLabel using jq
-                            geckoRev=$(jq -r '.[].clientDetails.geckoRev' "$json_file")
-                            matrixLabel=$(jq -r '.[].clientDetails.matrixLabel' "$json_file")
+                            geckoRev=$(jq -r '.[].clientDetails.geckoRev' "$matrix_json_file")
+                            matrixLabel=$(jq -r '.[].clientDetails.matrixLabel' "$matrix_json_file")
                             echo "Extracted geckoRev: $geckoRev"
                             echo "Extracted matrixLabel: $matrixLabel"
 
