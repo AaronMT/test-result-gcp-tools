@@ -86,8 +86,10 @@ jobs:
                     exit 0  # Exit gracefully if no zip files are found
                 fi
             - name: Process the crash reports
+              id: process_minidumps
               run: |
                 shopt -s nullglob  # Enable nullglob
+                crash_stack_processed=false
                 project_dirs=(crash_reports_unzipped/*/crash_reports/*/)
                 if [ ${#project_dirs[@]} -gt 0 ]; then
                     for project_dir in "${project_dirs[@]}"; do
@@ -143,11 +145,13 @@ jobs:
                                     output_file="${dmp_file%.dmp}.txt"
                                     minidump-stackwalk "$dmp_file" "$symbols_dir" --symbols-url https://symbols.mozilla.org --brief > "$output_file"
                                     echo "Stackwalk output saved to $output_file"
-                                    cat "$output_file"
+                                    crash_stack_processed=true
                                 else
                                     echo "No minidump files found in $project_dir"
                                 fi
                             done
+
+                            echo "crash_stack_processed=$crash_stack_processed" >> $GITHUB_OUTPUT
 
                             # Clean up symbols
                             rm -rf "$symbols_dir" "$project_dir/target.crashreporter-symbols.zip"
@@ -160,3 +164,24 @@ jobs:
                     echo "No projects found in crash_reports_unzipped."
                     exit 0  # Exit gracefully if no projects are found
                 fi
+            - name: Send Slack notification
+              if: steps.process_minidumps.outputs.crash_stack_processed == 'true'
+              uses: slackapi/slack-github-action@v1.27.0
+              with:
+                channel-id: C016BC5FUHJ
+                payload: |
+                    {
+                        "text": "Crash reports have been processed successfully.",
+                        "blocks": [
+                            {
+                                "type": "section",
+                                "text": {
+                                    "type": "mrkdwn",
+                                    "text": "Crash reports have been processed successfully."
+                                }
+                            }
+                        ]
+                    }
+              env:
+                SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+                SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
