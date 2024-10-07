@@ -171,7 +171,7 @@ jobs:
               if: steps.process_minidumps.outputs.crash_stack_processed == 'true'
               uses: actions/upload-artifact@v4.1.0
               with:
-                name: processed-crash-reports-${{ matrix.project.name }}
+                name: processed-crash-reports
                 path: processed_crash_reports/
 
             - name: Send Slack notification
@@ -186,4 +186,3 @@ jobs:
                 run_id: ${{ github.run_id }}
                 repository: ${{ github.repository }}
                 server_url: ${{ github.server_url }}
-                project_name: ${{ matrix.project.name }}
