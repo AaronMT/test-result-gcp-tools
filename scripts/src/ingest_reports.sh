@@ -7,18 +7,23 @@ if [ ! -f "$ZIP_FILE" ]; then
 fi
 
 # Get the current date in the format YYYY-MM-DD
-# Can be used to append to the launch name
 CURRENT_DATE=$(date +%Y-%m-%d)
 
+# JSON payload
+JSON_PAYLOAD=$(cat <<EOF
+{
+  "description": "GitHub Actions Import: All Architectures",
+  "mode": "DEFAULT",
+  "name": "${REPORT_PORTAL_PROJECT_NAME} for android"
+}
+EOF
+)
+
 # Execute the curl command and capture the output and exit status
-response=$(curl -v -L -X POST "http://$REPORT_PORTAL_API_ENDPOINT/api/v1/$REPORT_PORTAL_PROJECT_NAME/launch/import" \
--H "Authorization: Bearer $REPORT_PORTAL_API_TOKEN" \
--F "file=@$ZIP_FILE;type=application/zip" \
--F "launchImportRq={
-  \"description\": \"GitHub Actions Import: All Architectures\",
-  \"mode\": \"DEFAULT\",
-  \"name\": \"$REPORT_PORTAL_PROJECT_NAME for android\"
-};type=application/json" 2>&1)
+response=$(curl -v -L "https://$REPORT_PORTAL_API_ENDPOINT/api/v1/$REPORT_PORTAL_PROJECT_NAME/launch/import" \
+  -H "Authorization: Bearer $REPORT_PORTAL_API_TOKEN" \
+  -F "file=@$ZIP_FILE;type=application/zip" \
+  --form-string "launchImportRq=$JSON_PAYLOAD;type=application/json" 2>&1)
 
 status=$?
 
