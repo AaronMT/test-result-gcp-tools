@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Ensure the file exists
+# Ensure the ZIP file exists
 if [ ! -f "$ZIP_FILE" ]; then
   echo "Error: File $ZIP_FILE not found."
   exit 1
@@ -9,21 +9,16 @@ fi
 # Get the current date in the format YYYY-MM-DD
 CURRENT_DATE=$(date +%Y-%m-%d)
 
-# JSON payload
-JSON_PAYLOAD=$(cat <<EOF
-{
-  "description": "GitHub Actions Import: All Architectures",
-  "mode": "DEFAULT",
-  "name": "${REPORT_PORTAL_PROJECT_NAME} for android"
-}
-EOF
-)
-
 # Execute the curl command and capture the output and exit status
-response=$(curl -v -L "https://$REPORT_PORTAL_API_ENDPOINT/api/v1/$REPORT_PORTAL_PROJECT_NAME/launch/import" \
+response=$(curl -v -L -X POST "https://$REPORT_PORTAL_API_ENDPOINT/api/v1/$REPORT_PORTAL_PROJECT_NAME/launch/import" \
+  -H 'Content-Type: multipart/form-data' \
   -H "Authorization: Bearer $REPORT_PORTAL_API_TOKEN" \
-  -F "file=@$ZIP_FILE;type=application/zip" \
-  --form-string "launchImportRq=$JSON_PAYLOAD;type=application/json" 2>&1)
+  -F 'file=@'"$ZIP_FILE"';type=application/x-zip-compressed' \
+  -F 'launchImportRq="{
+    \"description\": \"GitHub Actions Import: All Architectures\",
+    \"mode\": \"DEFAULT\",
+    \"name\": \"'"${REPORT_PORTAL_PROJECT_NAME}"' for android\"
+  }";type=application/json' 2>&1)
 
 status=$?
 
