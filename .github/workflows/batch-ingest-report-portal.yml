@@ -72,6 +72,12 @@ jobs:
             - name: Inspect and remove empty JUnit XML reports
               run: |
                 python3 scripts/src/inspect_reports.py junit_reports
+            - name: Adjust timestamps from XML reports to UTC
+              run: |
+                python3 scripts/src/adjust_timestamps.py junit_reports
+            - name: Preserve only reports with failures
+              run: |
+                python3 scripts/src/preserve_failures.py junit_reports
             - name: Archive the reports into a zip file
               run: |
                 ZIP_FILE="FullJunitXmlReports_$(date +%Y%m%d_%H%M%S).zip"
