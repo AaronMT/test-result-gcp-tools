@@ -1,7 +1,10 @@
 name: Batch process Android minidump crash reports on Cloud Storage from Firebase Test Lab
 
 on:
-   workflow_dispatch:
+    workflow_dispatch:
+    schedule:
+        - cron: '0 5 * * *'  # Runs at 5:00 AM UTC every day
+
 
 jobs:
     download_minidumps:
