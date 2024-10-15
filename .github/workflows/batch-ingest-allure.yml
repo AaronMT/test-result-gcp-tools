@@ -14,10 +14,8 @@ jobs:
               project:
                   - name: "Fenix"
                     bucket_name: "GCS_BUCKET_NAME_A"
-                    report_portal_project_name: "REPORT_PORTAL_PROJECT_NAME_A"
                   - name: "Focus"
                     bucket_name: "GCS_BUCKET_NAME_B"
-                    report_portal_project_name: "REPORT_PORTAL_PROJECT_NAME_B"
         steps:
             - name: Checkout the repository
               uses: actions/checkout@v4.1.7
@@ -29,9 +27,18 @@ jobs:
               uses: google-github-actions/setup-gcloud@v2.1.1
               with:
                 project_id: ${{ secrets.GCP_PROJECT_ID }}
+            - name: Set up Homebrew
+              id: set-up-homebrew
+              uses: Homebrew/actions/setup-homebrew@master
+
+            - name: Set up Python 3.
+              uses: actions/setup-python@v5.2.0
+              with:
+                python-version: '3.12'
             - name: Install Dependencies
               run: |
-                python3 -m pip install junitparser==3.2.0
+                python -m pip install junitparser==3.2.0
+                brew install allure
             - name: Copy JUnit reports from the last 24 hours from GCS
               run: |
                 BUCKET_NAME="${{ secrets[matrix.project.bucket_name] }}"
@@ -67,12 +74,20 @@ jobs:
                 done
             - name: Inspect and remove empty JUnit XML reports
               run: |
-                python3 scripts/src/inspect_reports.py junit_reports
+                python scripts/src/inspect_reports.py junit_reports
             - name: Archive the reports into a zip file
               run: |
                 ZIP_FILE="FullJunitXmlReports_$(date +%Y%m%d_%H%M%S).zip"
                 zip -r $ZIP_FILE junit_reports/
                 echo "ZIP_FILE=$ZIP_FILE" >> $GITHUB_ENV
+            - name: Download Allure history from Cloud Storage
+              run: |
+                BUCKET_NAME="${{ secrets.GCP_ALLURE_BUCKET }}"
+                HISTORY_GCS_PATH="gs://$BUCKET_NAME/${{ matrix.project.name }}/allure-report/history"
+                mkdir -p junit_reports/history
+                gsutil -m cp -r "$HISTORY_GCS_PATH" junit_reports/history || echo "No history found, proceeding without it."
+                echo "123" > 123.txt
+                gsutil cp 123.txt "gs://${{ secrets.GCP_ALLURE_BUCKET }}/${{ matrix.project.name }}/allure-report/history/123.txt"
             - name: Upload artifact
               uses: actions/upload-artifact@v4.4.0
               with:
