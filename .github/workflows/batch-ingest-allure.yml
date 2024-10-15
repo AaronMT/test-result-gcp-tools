@@ -80,14 +80,26 @@ jobs:
                 ZIP_FILE="FullJunitXmlReports_$(date +%Y%m%d_%H%M%S).zip"
                 zip -r $ZIP_FILE junit_reports/
                 echo "ZIP_FILE=$ZIP_FILE" >> $GITHUB_ENV
+            - name: Prepare Allure Results Directory
+              run: |
+                mkdir -p junit_reports/allure-results
             - name: Download Allure history from Cloud Storage
               run: |
                 BUCKET_NAME="${{ secrets.GCP_ALLURE_BUCKET }}"
                 HISTORY_GCS_PATH="gs://$BUCKET_NAME/${{ matrix.project.name }}/allure-report/history"
-                mkdir -p junit_reports/history
-                gsutil -m cp -r "$HISTORY_GCS_PATH" junit_reports/history || echo "No history found, proceeding without it."
-                echo "123" > 123.txt
-                gsutil cp 123.txt "gs://${{ secrets.GCP_ALLURE_BUCKET }}/${{ matrix.project.name }}/allure-report/history/123.txt"
+                mkdir -p junit_reports/allure-results/history
+                gsutil -m cp -r "$HISTORY_GCS_PATH/*" junit_reports/allure-results/history || echo "No history found, proceeding without it."
+            - name: Copy JUnit XML Files to Allure Results
+              run: |
+                cp junit_reports/*.xml junit_reports/allure-results/
+            - name: Generate Allure Report
+              run: |
+                allure generate junit_reports/allure-results --clean -o junit_reports/allure-report
+            - name: Upload Allure Report to Cloud Storage
+              run: |
+                BUCKET_NAME="${{ secrets.GCP_ALLURE_BUCKET }}"
+                REPORT_GCS_PATH="gs://$BUCKET_NAME/${{ matrix.project.name }}/allure-report"
+                gsutil -m cp -r junit_reports/allure-report/* "$REPORT_GCS_PATH"
             - name: Upload artifact
               uses: actions/upload-artifact@v4.4.0
               with:
