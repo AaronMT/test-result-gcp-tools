@@ -61,6 +61,8 @@ jobs:
         name: Process Android minidump crash reports
         runs-on: ubuntu-latest
         needs: download_minidumps
+        outputs:
+          crash_stack_processed: ${{ steps.process_minidumps.outputs.crash_stack_processed }}
         steps:
             - name: Checkout the repository
               uses: actions/checkout@v4.1.7
@@ -189,3 +191,11 @@ jobs:
                 run_id: ${{ github.run_id }}
                 repository: ${{ github.repository }}
                 server_url: ${{ github.server_url }}
+    crash_stack_processed:
+        name: Check if crash reports were processed
+        runs-on: ubuntu-latest
+        needs: process_minidumps
+        if: needs.process_minidumps.outputs.crash_stack_processed == 'true'
+        steps:
+          - name: No-op
+            run: echo "Crash reports were processed. Logged in Action Usage Metrics."
