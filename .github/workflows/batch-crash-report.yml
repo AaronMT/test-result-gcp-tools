@@ -148,11 +148,14 @@ jobs:
                             for dmp_file in "$project_dir"/*.dmp; do
                                 if [ -f "$dmp_file" ]; then
                                     echo "Processing minidump file: $dmp_file"
-                                    output_file="${dmp_file%.dmp}.txt"
-                                    minidump-stackwalk "$dmp_file" "$symbols_dir" --symbols-url https://symbols.mozilla.org --brief > "$output_file"
-                                    echo "Stackwalk output saved to $output_file"
+                                    base_name=$(basename "${dmp_file%.dmp}")
+                                    human_output_file="${base_name}.txt"
+                                    json_output_file="${base_name}.json"
+
+                                    minidump-stackwalk "$dmp_file" "$symbols_dir" --symbols-url https://symbols.mozilla.org --cyborg "$json_output_file" --output-file "$human_output_file"
+                                    echo "Stackwalk outputs saved to $human_output_file and $json_output_file"
                                     crash_stack_processed=true
-                                    mv $output_file processed_crash_reports/
+                                    mv "$human_output_file" "$json_output_file" processed_crash_reports/
                                 else
                                     echo "No minidump files found in $project_dir"
                                 fi
@@ -171,6 +174,26 @@ jobs:
                     echo "No projects found in crash_reports_unzipped."
                     exit 0  # Exit gracefully if no projects are found
                 fi
+
+            - name: Output crash data to summary
+              if: steps.process_minidumps.outputs.crash_stack_processed == 'true'
+              run: |
+                echo "## Crash Report Summary" >> $GITHUB_STEP_SUMMARY
+                for crash_file in processed_crash_reports/*.json; do
+                  if [ -f "$crash_file" ]; then
+                    echo "Processing crash file: $crash_file"
+                    file=$(jq -r '.crashing_thread.frames[0].file // "N/A"' "$crash_file")
+                    function=$(jq -r '.crashing_thread.frames[0].function // "N/A"' "$crash_file")
+                    module=$(jq -r '.crashing_thread.frames[0].module // "N/A"' "$crash_file")
+                    echo "### $(basename $crash_file)" >> $GITHUB_STEP_SUMMARY
+                    echo "- **File**: $file" >> $GITHUB_STEP_SUMMARY
+                    echo "- **Function**: $function" >> $GITHUB_STEP_SUMMARY
+                    echo "- **Module**: $module" >> $GITHUB_STEP_SUMMARY
+                    echo "" >> $GITHUB_STEP_SUMMARY
+                  else
+                    echo "No crash files found."
+                  fi
+                done
 
             - name: Upload processed crash reports
               if: steps.process_minidumps.outputs.crash_stack_processed == 'true'
