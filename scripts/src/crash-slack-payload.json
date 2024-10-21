@@ -18,7 +18,7 @@
 					"type": "section",
 					"text": {
 						"type": "mrkdwn",
-						"text": "*Crash Reports*: <${{ env.server_url }}/${{ env.repository }}/actions/runs/${{ env.run_id }}|View Run>"
+						"text": "*Crash Reports*: <${{ env.server_url }}/${{ env.repository }}/actions/runs/${{ env.run_id }}|View Run> & <${{ env.public_url }}|View Report>"
 					}
 				},
 				{
