@@ -162,7 +162,7 @@ def update_google_sheet_with_cumulative_data(client, csv_filename, project_name)
         csv_filename (str): Path to the CSV file containing aggregated results.
         project_name (str): Name of the project (used to identify the correct worksheet).
     """
-    # Define the sheet name for the project (each project has its own worksheet)
+    # Define the sheet name for the project
     sheet_title = f"Aggregated Results - {project_name}"
 
     # Try to open the worksheet; if it doesn't exist, create it
@@ -170,9 +170,12 @@ def update_google_sheet_with_cumulative_data(client, csv_filename, project_name)
         sheet = client.open("Fenix and Focus - Automated Flaky & Failure Tracking").worksheet(sheet_title)
     except gspread.exceptions.WorksheetNotFound:
         sheet = client.open("Fenix and Focus - Automated Flaky & Failure Tracking").add_worksheet(title=sheet_title, rows="1000", cols="7")
-        # Write headers
+
+    # Check if the first row (headers) exists; if not, add them
+    if not sheet.row_values(1):  # If the first row is empty, add headers
         headers = ["Class Name", "Test Name", "Total Runs", "Flaky Runs", "Failed Runs", "Flaky Rate", "Failure Rate"]
         sheet.append_row(headers)
+
     # Read existing data from the sheet
     existing_records = sheet.get_all_records()
     existing_data = {}
