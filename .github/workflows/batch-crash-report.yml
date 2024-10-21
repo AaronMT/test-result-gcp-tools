@@ -206,12 +206,17 @@ jobs:
                 name: processed-crash-reports
                 path: processed_crash_reports/
 
-            - name: Upload processed crash reports to Cloud Storage (Marketplace Action)
+            - name: Upload processed crash reports to Cloud Storage
               uses: 'google-github-actions/upload-cloud-storage@v2.2.0'
+              id: upload_crash_reports
               with:
                 path: processed_crash_reports
                 destination: '${{ secrets.GCS_BUCKET_CRASH_REPORTS }}/public/firebase-test-lab-crashes-android/${{ matrix.project.name }}/reports/'
                 glob: '**/*.txt'
+
+            - name: Get public URL for the uploaded crash reports
+              if: steps.process_minidumps.outputs.crash_stack_processed == 'true'
+              run: echo "PUBLIC_URL=https://storage.googleapis.com/${{ steps.upload_crash_reports.outputs.uploaded }}" | sed 's|gs://||' >> $GITHUB_ENV
 
             - name: Send Slack notification
               if: steps.process_minidumps.outputs.crash_stack_processed == 'true'
@@ -225,6 +230,7 @@ jobs:
                 run_id: ${{ github.run_id }}
                 repository: ${{ github.repository }}
                 server_url: ${{ github.server_url }}
+                public_url: ${{ env.PUBLIC_URL }}
     crash_stack_processed:
         name: Check if crash reports were processed
         runs-on: ubuntu-latest
