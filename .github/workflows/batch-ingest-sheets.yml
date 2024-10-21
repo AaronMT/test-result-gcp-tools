@@ -1,0 +1,95 @@
+name: Batch ingest JUnit XML reports from Cloud Storage to Sheets
+
+on:
+    workflow_dispatch:
+    schedule:
+        - cron: '0 5 * * *'  # Runs at 5:00 AM UTC every day
+
+jobs:
+    ingest_reports:
+        name: Ingest JUnit Reports for ${{ matrix.project.name }}
+        runs-on: ubuntu-latest
+        strategy:
+          matrix:
+              project:
+                  - name: "Fenix"
+                    bucket_name: "GCS_BUCKET_NAME_A"
+                  - name: "Focus"
+                    bucket_name: "GCS_BUCKET_NAME_B"
+        steps:
+            - name: Checkout the repository
+              uses: actions/checkout@v4.1.7
+            - name: Authenticate with Google Cloud
+              uses: google-github-actions/auth@v2.1.5
+              with:
+                credentials_json: ${{ secrets.GCP_SA_KEY }}
+            - name: Set up Google Cloud SDK
+              uses: google-github-actions/setup-gcloud@v2.1.1
+              with:
+                project_id: ${{ secrets.GCP_PROJECT_ID }}
+            - name: Set up Python 3.
+              uses: actions/setup-python@v5.2.0
+              with:
+                python-version: '3.12'
+            - name: Install Dependencies
+              run: |
+                python -m pip install junitparser==3.2.0
+                python -m pip install gspread==6.1.4
+            - name: Copy JUnit reports from the last 24 hours from GCS
+              run: |
+                BUCKET_NAME="${{ secrets[matrix.project.bucket_name] }}"
+                DATE_PREFIX=$(date -u -d 'yesterday' +%Y-%m-%d)  # Get the current date in UTC
+
+                mkdir -p junit_reports
+
+                # Find and download the FullJunitXmlReport.xml files from the last 24 hours
+                gsutil ls "gs://$BUCKET_NAME/*$DATE_PREFIX*/FullJUnitReport.xml" | while read -r file; do
+                  # Extract directory name from the full path
+                  DIR_NAME=$(basename $(dirname "$file"))
+                  # Define the destination file name with the directory name appended
+                  DEST_FILE="./junit_reports/FullJUnitReport-${DIR_NAME}.xml"
+                  # Matrix file path
+                  MATRIX_FILE="$(dirname "$file")/matrix_ids.json"
+                  LOCAL_MATRIX_FILE="./junit_reports/matrix_ids-${DIR_NAME}.json"
+
+                  if gsutil cp "$MATRIX_FILE" "$LOCAL_MATRIX_FILE"; then
+                    echo "Inspecting $LOCAL_MATRIX_FILE"
+                    if [ -f "$LOCAL_MATRIX_FILE" ]; then
+                      MATRIX_LABEL=$(jq -r 'to_entries | map(select(.value.clientDetails.matrixLabel == "try")) | first | .value.clientDetails.matrixLabel' "$LOCAL_MATRIX_FILE")
+                      if [ "$MATRIX_LABEL" == "try" ]; then
+                        echo "Skipping $file because matrixLabel is 'try'"
+                        continue
+                      fi
+                    fi
+                  else
+                    echo "Warning: matrix_ids.json not found for $file, proceeding with copy"
+                  fi
+
+                  # Copy the FullJUnitReport.xml file with the new name to avoid overwriting
+                  gsutil cp "$file" "$DEST_FILE"
+                done
+            - name: Inspect and remove empty JUnit XML reports
+              run: |
+                python scripts/src/inspect_reports.py junit_reports
+            - name: Archive the reports into a zip file
+              run: |
+                ZIP_FILE="FullJunitXmlReports_$(date +%Y%m%d_%H%M%S).zip"
+                zip -r $ZIP_FILE junit_reports/
+                echo "ZIP_FILE=$ZIP_FILE" >> $GITHUB_ENV
+            - name: Run aggregation script
+              env:
+                GOOGLE_SHEETS_KEY: ${{ secrets.GCP_SA_KEY}}
+              run: |
+                python scripts/src/ingest_spreadsheet.py junit_reports
+            - name: Upload reports artifact
+              uses: actions/upload-artifact@v4.4.0
+              with:
+                name: junit-xml-reports-${{ matrix.project.name }}
+                path: ${{ env.ZIP_FILE }}
+            - name: Upload CSV artifacts
+              uses: actions/upload-artifact@v4.4.0
+              with:
+                name: junit-xml-reports-${{ matrix.project.name }}-csv
+                path: |
+                  aggregated_test_results.csv
+                  daily_totals.csv
