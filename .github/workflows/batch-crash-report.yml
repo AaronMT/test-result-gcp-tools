@@ -215,8 +215,10 @@ jobs:
                 glob: '**/*.txt'
 
             - name: Get public URL for the uploaded crash reports
+              id: get_public_url
               if: steps.process_minidumps.outputs.crash_stack_processed == 'true'
-              run: echo "PUBLIC_URL=https://storage.googleapis.com/${{ steps.upload_crash_reports.outputs.uploaded }}" | sed 's|gs://||' >> $GITHUB_ENV
+              run: |
+               echo "PUBLIC_URL=https://storage.googleapis.com/$(echo '${{ steps.upload_crash_reports.outputs.uploaded }}' | cut -d',' -f1 | sed 's|gs://||')" >> $GITHUB_ENV
 
             - name: Send Slack notification
               if: steps.process_minidumps.outputs.crash_stack_processed == 'true'
