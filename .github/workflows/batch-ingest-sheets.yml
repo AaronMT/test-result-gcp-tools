@@ -79,6 +79,7 @@ jobs:
             - name: Run aggregation script
               env:
                 GOOGLE_SHEETS_KEY: ${{ secrets.GCP_SA_KEY}}
+                PROJECT_NAME: ${{ matrix.project.name }}
               run: |
                 python scripts/src/ingest_spreadsheet.py junit_reports
             - name: Upload reports artifact
