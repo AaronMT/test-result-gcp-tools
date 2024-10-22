@@ -256,13 +256,14 @@ def update_google_sheet_with_cumulative_data(client, csv_filename, project_name)
         sheet.append_rows(new_rows, value_input_option='USER_ENTERED')
 
 
-def update_daily_totals_sheet(client, daily_totals, sheet_name):
+def update_daily_totals_sheet(client, daily_totals, sheet_name, project_name):
     # Open the worksheet for daily totals
     sheet = client.open("Fenix and Focus - Automated Flaky & Failure Tracking").worksheet(sheet_name)
 
     # Check if headers exist; if not, add them
     headers = [
         "Date",
+        "Project Name",
         "Total Runs",
         "Flaky Runs",
         "Failed Runs",
@@ -275,6 +276,7 @@ def update_daily_totals_sheet(client, daily_totals, sheet_name):
     # Append the daily totals
     row_data = [
         daily_totals["Date"],
+        project_name,
         daily_totals["Total Runs"],
         daily_totals["Flaky Runs"],
         daily_totals["Failed Runs"],
@@ -308,7 +310,7 @@ if __name__ == "__main__":
 
     # Update Google Sheets with cumulative data
     update_google_sheet_with_cumulative_data(client, output_csv, project_name)
-    update_daily_totals_sheet(client, daily_totals, "Daily Totals")
+    update_daily_totals_sheet(client, daily_totals, "Daily Totals", project_name)
 
     print(
         f"Aggregated test results have been written to {output_csv}, daily totals written to {daily_totals_csv}, and Google Sheets updated with cumulative data."
