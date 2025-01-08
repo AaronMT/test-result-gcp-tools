@@ -10,7 +10,7 @@ google-resumable-media==2.7.1
 googleapis-common-protos==1.66.0
 idna==3.7
 proto-plus==1.24.0
-protobuf==5.27.2
+protobuf==5.29.2
 pyasn1==0.6.0
 pyasn1_modules==0.4.0
 requests==2.32.3
