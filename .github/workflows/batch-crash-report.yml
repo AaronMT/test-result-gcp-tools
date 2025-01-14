@@ -222,7 +222,7 @@ jobs:
 
             - name: Send Slack notification
               if: steps.process_minidumps.outputs.crash_stack_processed == 'true'
-              uses: slackapi/slack-github-action@v1.27.0
+              uses: slackapi/slack-github-action@v2.0.0
               with:
                 channel-id: C016BC5FUHJ
                 payload-file-path: ./scripts/src/crash-slack-payload.json
