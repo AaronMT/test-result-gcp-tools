@@ -226,6 +226,7 @@ jobs:
               with:
                 channel-id: C016BC5FUHJ
                 payload-file-path: ./scripts/src/crash-slack-payload.json
+                payload-templated: true
               env:
                 SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
                 SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
