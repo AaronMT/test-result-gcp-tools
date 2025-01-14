@@ -1,2 +1,2 @@
 # test-result-gcp-tools
-Small repository containing a few scripts and Cloud Functions for test report (JUnit) ingestion into Firestore on GCP.
+Small repository containing a few scripts and Github Actions for test result ingestion and crash processing from Google Cloud Storage and Firebase Test Lab
