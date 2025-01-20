@@ -12,7 +12,7 @@ idna==3.7
 proto-plus==1.24.0
 protobuf==5.29.3
 pyasn1==0.6.1
-pyasn1_modules==0.4.0
+pyasn1_modules==0.4.1
 requests==2.32.3
 rsa==4.9
 urllib3==2.3.0
