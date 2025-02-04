@@ -25,7 +25,7 @@ jobs:
               with:
                 credentials_json: ${{ secrets.GCP_SA_KEY }}
             - name: Set up Google Cloud SDK
-              uses: google-github-actions/setup-gcloud@v2.1.2
+              uses: google-github-actions/setup-gcloud@v2.1.4
               with:
                 project_id: ${{ secrets.GCP_PROJECT_ID }}
             - name: Download Android minidump crash reports from the last 24 hours from Google Cloud Storage
