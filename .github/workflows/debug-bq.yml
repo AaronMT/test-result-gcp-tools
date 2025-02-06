@@ -1,0 +1,36 @@
+name: Debug BigQuery Setup
+
+on:
+  workflow_dispatch:
+
+jobs:
+  debug-bq:
+    name: Debug BigQuery Setup
+    runs-on: ubuntu-latest
+    env:
+      BQ_PROJECT_ID: ${{ secrets.BQ_PROJECT_ID }}
+      BQ_DATASET: "testops_stats"
+      BQ_DUMMY_TABLE: "dummy"
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4.2.2
+      - name: Authenticate with Google Cloud
+        uses: google-github-actions/auth@v2.1.8
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - name: Setup Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2.1.4
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+      - name: Force Set Google Cloud Project
+        run: |
+            echo "Resetting Google Cloud project..."
+            gcloud config set project ${{ env.BQ_PROJECT_ID }}
+            echo "Google Cloud project reset to ${{ env.BQ_PROJECT_ID }}"
+        shell: bash
+
+      - name: Verify Google Cloud Configuration
+        run: |
+            gcloud config list --format="value(core.project)"
+            bq show --format=prettyjson ${{ env.BQ_PROJECT_ID }}:${{ env.BQ_DATASET }}.${{ env.BQ_DUMMY_TABLE }}
+        shell: bash

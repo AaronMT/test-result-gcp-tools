@@ -129,7 +129,7 @@ jobs:
                 if [[ -f "$csv_file" ]]; then
                   echo "Uploading $csv_file to $table"
                   for attempt in {1..3}; do
-                    if bq load --apilog=log_${{ matrix.project.name }}.log --autodetect --source_format=CSV "$table" "$csv_file"; then
+                    if bq load --project_id=${{ secrets.BQ_PROJECT_ID}} --apilog=log_${{ matrix.project.name }}.log --autodetect --source_format=CSV "$table" "$csv_file"; then
                       echo "Upload successful!"
                       break  # Exit loop on success
                     fi
