@@ -101,7 +101,7 @@ jobs:
                 REPORT_GCS_PATH="gs://$BUCKET_NAME/${{ matrix.project.name }}/allure-report"
                 gsutil -m cp -r junit_reports/allure-report/* "$REPORT_GCS_PATH"
             - name: Upload artifact
-              uses: actions/upload-artifact@v4.6.1
+              uses: actions/upload-artifact@v4.6.2
               with:
                 name: junit-xml-reports-${{ matrix.project.name }}
                 path: ${{ env.ZIP_FILE }}
