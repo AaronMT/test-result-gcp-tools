@@ -76,7 +76,7 @@ jobs:
               run: |
                 cargo install minidump-stackwalk
             - name: Download crash reports artifact
-              uses: actions/download-artifact@v4.1.9
+              uses: actions/download-artifact@v4.2.1
               with:
                 path: crash_reports
               continue-on-error: true
