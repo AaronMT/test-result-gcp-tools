@@ -32,7 +32,7 @@ jobs:
               uses: Homebrew/actions/setup-homebrew@master
 
             - name: Set up Python 3.
-              uses: actions/setup-python@v5.4.0
+              uses: actions/setup-python@v5.5.0
               with:
                 python-version: '3.12'
             - name: Install Dependencies
