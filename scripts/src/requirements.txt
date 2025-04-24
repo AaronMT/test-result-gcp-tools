@@ -7,7 +7,7 @@ google-cloud-core==2.4.3
 google-cloud-storage==2.19.0
 google-crc32c==1.6.0
 google-resumable-media==2.7.2
-googleapis-common-protos==1.69.2
+googleapis-common-protos==1.70.0
 idna==3.10
 proto-plus==1.26.1
 protobuf==6.30.2
