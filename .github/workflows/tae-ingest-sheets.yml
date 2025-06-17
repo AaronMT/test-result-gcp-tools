@@ -1,11 +1,12 @@
-name: Ingest TAE to Sheets
-
+name: Ingest TAE test stats from Allure to Google Sheets
 on:
     workflow_dispatch:
+    schedule:
+        - cron: '0 6 * * *'  # Runs at 6:00 AM UTC every day
 
 jobs:
   ingest_sheets:
-    name: Ingest Sheets Data
+    name: Ingest TAE to Sheets
     runs-on: ubuntu-latest
 
     steps:
@@ -27,3 +28,15 @@ jobs:
 
       - name: Run durations.py
         run: python tae-scripts/src/durations.py
+    
+      - name: Authenticate with Google Cloud
+        uses: google-github-actions/auth@v2.1.10
+        with:
+            credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - name: Run aggregation script
+        env:
+            GOOGLE_SHEETS_KEY: ${{ secrets.GCP_SA_KEY}}
+        
+        run: |
+          python tae-scripts/src/import_csv_to_gsheet.py
+
