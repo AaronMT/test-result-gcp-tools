@@ -36,7 +36,5 @@ jobs:
       - name: Run aggregation script
         env:
             GOOGLE_SHEETS_KEY: ${{ secrets.GCP_SA_KEY}}
-        
         run: |
           python tae-scripts/src/import_csv_to_gsheet.py
-

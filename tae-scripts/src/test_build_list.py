@@ -5,17 +5,24 @@ import json
 OWNER = 'mozilla-firefox'
 REPO = 'firefox'
 BRANCH = 'autoland'
-API_URL = f'https://api.github.com/repos/{OWNER}/{REPO}/contents/mobile/android/fenix/app/src/androidTest/java/org/mozilla/fenix/ui/efficiency/tests?ref={BRANCH}'
+API_URL = f'https://api.github.com/repos/{OWNER}/{REPO}/contents/mobile/android/fenix/app/src/androidTest/java/org/mozilla/fenix/ui?ref={BRANCH}'
 HEADERS = {
     'Accept': 'application/vnd.github.v3+json',
 }
 
 
-def get_kotlin_test_files():
-    response = requests.get(API_URL, headers=HEADERS)
+def get_kotlin_test_files(path_url=API_URL):
+    kotlin_files = []
+    response = requests.get(path_url, headers=HEADERS)
     response.raise_for_status()
-    files = response.json()
-    kotlin_files = [file for file in files if file['name'].endswith('.kt')]
+    items = response.json()
+
+    for item in items:
+        if item['type'] == 'file' and item['name'].endswith('.kt'):
+            kotlin_files.append(item)
+        elif item['type'] == 'dir':
+            kotlin_files.extend(get_kotlin_test_files(item['url']))
+
     return kotlin_files
 
 
@@ -42,7 +49,7 @@ def extract_tests_from_file(file_info):
 
 
 def main():
-    kotlin_files = get_kotlin_test_files()
+    kotlin_files = get_kotlin_test_files(API_URL)
     tests = []
 
     for file_info in kotlin_files:
