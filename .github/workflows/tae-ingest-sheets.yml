@@ -30,7 +30,7 @@ jobs:
         run: python tae-scripts/src/durations.py
     
       - name: Authenticate with Google Cloud
-        uses: google-github-actions/auth@v2.1.11
+        uses: google-github-actions/auth@v2.1.12
         with:
             credentials_json: ${{ secrets.GCP_SA_KEY }}
       - name: Run aggregation script
