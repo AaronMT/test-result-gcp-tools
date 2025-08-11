@@ -3,7 +3,7 @@ import glob
 import csv
 from junitparser import JUnitXml, Failure
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 import gspread
 import json
 
@@ -42,6 +42,79 @@ def aggregate_test_results(xml_directory):
                 # Else, it's a passed test; no action needed
 
     return test_data
+
+
+def append_daily_per_test_issues_only(
+    client,
+    aggregated_results,
+    project_name,
+    run_date=None,
+    sheet_title=None,
+):
+    """
+    Appends one row per (class,test) with issues (flaky>0 or failed>0)
+    into a per-project worksheet.
+
+    Behavior:
+    - Removes existing rows for the given date+project (avoid duplicates)
+    - Keeps only the last 7 days of data (rolling window)
+    """
+    run_date = run_date or datetime.utcnow().strftime("%Y-%m-%d")
+    sheet_title = sheet_title or f"Trending Results - {project_name}"
+    keep_days = 7  # rolling window length
+
+    ss = client.open("Fenix and Focus - Automated Flaky & Failure Tracking")
+
+    try:
+        ws = ss.worksheet(sheet_title)
+    except gspread.exceptions.WorksheetNotFound:
+        ws = ss.add_worksheet(title=sheet_title, rows="1000", cols="7")
+        ws.update("A1:G1", [[
+            "date", "project_name", "class_name", "test_name",
+            "total_runs", "flaky_runs", "failed_runs"
+        ]])
+
+    # Load all current rows
+    values = ws.get_all_values()  # includes header
+
+    # 1) Remove duplicates for today's date+project
+    if len(values) > 1:
+        to_delete_today = [
+            idx for idx, row in enumerate(values[1:], start=2)
+            if len(row) >= 2 and row[0] == run_date and row[1] == project_name
+        ]
+        for r in reversed(to_delete_today):
+            ws.delete_rows(r)
+
+    # 2) Prune rows older than the 7-day window
+    if len(values) > 1:
+        cutoff = (datetime.utcnow() - timedelta(days=keep_days)).strftime("%Y-%m-%d")
+        values_after_dupe_check = ws.get_all_values()[1:]  # after dupe deletion
+        to_delete_old = [
+            idx for idx, row in enumerate(values_after_dupe_check, start=2)
+            if len(row) >= 1 and row[0] < cutoff
+        ]
+        for r in reversed(to_delete_old):
+            ws.delete_rows(r)
+
+    # 3) Append today's issue rows
+    out_rows = []
+    for r in aggregated_results:
+        flaky = int(r.get("Flaky Runs", 0))
+        failed = int(r.get("Failed Runs", 0))
+        if flaky > 0 or failed > 0:
+            out_rows.append([
+                run_date,
+                project_name,
+                r.get("Class Name", ""),
+                r.get("Test Name", ""),
+                int(r.get("Total Runs", 0)),
+                flaky,
+                failed,
+            ])
+
+    if out_rows:
+        ws.append_rows(out_rows, value_input_option="USER_ENTERED")
 
 
 def calculate_rates(test_data):
@@ -307,6 +380,19 @@ if __name__ == "__main__":
 
     # Authenticate once and pass client to update functions
     client = authenticate_google_sheets()
+
+    # Append daily issues to the per-project worksheet
+    run_date = os.environ.get("RUN_DATE") or datetime.utcnow().strftime("%Y-%m-%d")
+    try:
+        append_daily_per_test_issues_only(
+            client=client,
+            aggregated_results=aggregated_results,
+            project_name=project_name,
+            run_date=run_date,
+            sheet_title=f"Trending Results - {project_name}",
+        )
+    except Exception as e:
+        print(f"[Warning] Failed to update trending sheet for {project_name}: {e}")
 
     # Update Google Sheets with cumulative data
     update_google_sheet_with_cumulative_data(client, output_csv, project_name)
