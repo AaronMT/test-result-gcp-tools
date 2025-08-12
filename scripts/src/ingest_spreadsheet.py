@@ -59,7 +59,7 @@ def append_daily_per_test_issues_only(
     - Removes existing rows for the given date+project (avoid duplicates)
     - Keeps only the last 7 days of data (rolling window)
     """
-    run_date = run_date or datetime.utcnow().strftime("%Y-%m-%d")
+    run_date = run_date or (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d")
     sheet_title = sheet_title or f"Trending Results - {project_name}"
     keep_days = 7  # rolling window length
 
@@ -382,7 +382,8 @@ if __name__ == "__main__":
     client = authenticate_google_sheets()
 
     # Append daily issues to the per-project worksheet
-    run_date = os.environ.get("RUN_DATE") or datetime.utcnow().strftime("%Y-%m-%d")
+    run_date = os.environ.get("RUN_DATE") or (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d")
+
     try:
         append_daily_per_test_issues_only(
             client=client,
