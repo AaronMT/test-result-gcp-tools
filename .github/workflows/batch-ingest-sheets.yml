@@ -18,7 +18,7 @@ jobs:
                     bucket_name: "GCS_BUCKET_NAME_B"
         steps:
             - name: Checkout the repository
-              uses: actions/checkout@v4.2.2
+              uses: actions/checkout@v5.0.0
             - name: Authenticate with Google Cloud
               uses: google-github-actions/auth@v2.1.12
               with:
