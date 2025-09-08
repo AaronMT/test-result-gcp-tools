@@ -20,7 +20,7 @@ jobs:
             - name: Checkout the repository
               uses: actions/checkout@v5.0.0
             - name: Authenticate with Google Cloud
-              uses: google-github-actions/auth@v2.1.12
+              uses: google-github-actions/auth@v3.0.0
               with:
                 credentials_json: ${{ secrets.GCP_SA_KEY }}
             - name: Set up Google Cloud SDK
