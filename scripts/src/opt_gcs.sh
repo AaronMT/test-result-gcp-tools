@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Simplified and fast GCS copy using gcloud storage
+# Replaces the "Copy JUnit reports from the last 24 hours from GCS" step
+
 BUCKET_NAME="${{ secrets[matrix.project.bucket_name] }}"
 DATE_PREFIX=$(date -u -d 'yesterday' +%Y-%m-%d)
 
@@ -7,8 +10,9 @@ mkdir -p junit_reports
 
 echo "Starting fast gcloud storage copy for date prefix: $DATE_PREFIX"
 
+# Use gcloud storage ls to get all directories for yesterday in one call
 echo "Finding directories for $DATE_PREFIX..."
-gcloud storage ls "gs://$BUCKET_NAME/${DATE_PREFIX}*/" > directories.txt 2>/dev/nul
+gcloud storage ls "gs://$BUCKET_NAME/${DATE_PREFIX}*/" > directories.txt 2>/dev/null
 
 if [ ! -s directories.txt ]; then
     echo "No directories found for date $DATE_PREFIX"
@@ -17,6 +21,7 @@ fi
 
 echo "Found $(wc -l < directories.txt) directories to check"
 
+# Process each directory to find ones with both required files
 valid_dirs=()
 while IFS= read -r dir; do
     if [ -z "$dir" ]; then continue; fi
@@ -46,6 +51,7 @@ while IFS= read -r dir; do
     }
 done < directories.txt
 
+# Clean up temp file
 rm directories.txt
 
 if [ ${#valid_dirs[@]} -eq 0 ]; then
