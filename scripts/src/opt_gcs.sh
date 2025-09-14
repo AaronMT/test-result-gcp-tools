@@ -1,57 +1,54 @@
 #!/bin/bash
 
-# Simplified and fast GCS copy using gcloud storage
-# Replaces the "Copy JUnit reports from the last 24 hours from GCS" step
+if [ -z "$BUCKET_NAME" ]; then
+    echo "Error: BUCKET_NAME environment variable is not set"
+    exit 1
+fi
 
-BUCKET_NAME="${{ secrets[matrix.project.bucket_name] }}"
 DATE_PREFIX=$(date -u -d 'yesterday' +%Y-%m-%d)
 
 mkdir -p junit_reports
 
 echo "Starting fast gcloud storage copy for date prefix: $DATE_PREFIX"
+echo "Using bucket: $BUCKET_NAME"
 
-# Use gcloud storage ls to get all directories for yesterday in one call
 echo "Finding directories for $DATE_PREFIX..."
 gcloud storage ls "gs://$BUCKET_NAME/${DATE_PREFIX}*/" > directories.txt 2>/dev/null
 
 if [ ! -s directories.txt ]; then
     echo "No directories found for date $DATE_PREFIX"
+    echo "Tried pattern: gs://$BUCKET_NAME/${DATE_PREFIX}*/"
     exit 0
 fi
 
 echo "Found $(wc -l < directories.txt) directories to check"
 
-# Process each directory to find ones with both required files
 valid_dirs=()
 while IFS= read -r dir; do
     if [ -z "$dir" ]; then continue; fi
     
     echo "Checking: $dir"
     
-    # Check if both files exist in parallel
-    {
-        gcloud storage ls "${dir}FullJUnitReport.xml" >/dev/null 2>&1 && echo "junit_ok"
-        gcloud storage ls "${dir}matrix_ids.json" >/dev/null 2>&1 && echo "matrix_ok"
-    } | {
-        junit_found=false
-        matrix_found=false
-        while read -r result; do
-            case $result in
-                "junit_ok") junit_found=true ;;
-                "matrix_ok") matrix_found=true ;;
-            esac
-        done
-        
-        if $junit_found && $matrix_found; then
-            valid_dirs+=("$dir")
-            echo "✓ Valid: $dir"
-        else
-            echo "✗ Missing files: $dir"
-        fi
-    }
+    # Check if both files exist
+    junit_exists=false
+    matrix_exists=false
+    
+    if gcloud storage ls "${dir}FullJUnitReport.xml" >/dev/null 2>&1; then
+        junit_exists=true
+    fi
+    
+    if gcloud storage ls "${dir}matrix_ids.json" >/dev/null 2>&1; then
+        matrix_exists=true
+    fi
+    
+    if $junit_exists && $matrix_exists; then
+        valid_dirs+=("$dir")
+        echo "✓ Valid: $dir"
+    else
+        echo "✗ Missing files: $dir (junit: $junit_exists, matrix: $matrix_exists)"
+    fi
 done < directories.txt
 
-# Clean up temp file
 rm directories.txt
 
 if [ ${#valid_dirs[@]} -eq 0 ]; then
