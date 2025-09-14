@@ -36,6 +36,8 @@ jobs:
                 python -m pip install junitparser==3.2.0
                 python -m pip install gspread==6.1.4
             - name: Copy JUnit reports from the last 24 hours from GCS
+              env:
+                BUCKET_NAME: ${{ secrets[matrix.project.bucket_name] }}
               run: |
                chmod +x ./scripts/src/opt_gcs.sh
                ./scripts/src/opt_gcs.sh
