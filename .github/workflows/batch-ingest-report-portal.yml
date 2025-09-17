@@ -35,7 +35,7 @@ jobs:
                 project_id: ${{ secrets.GCP_PROJECT_ID }}
             - name: Install Dependencies
               run: |
-                python3 -m pip install junitparser==3.2.0
+                python3 -m pip install junitparser==4.0.2
             - name: Copy JUnit reports from the last 24 hours from GCS
               run: |
                 BUCKET_NAME="${{ secrets[matrix.project.bucket_name] }}"
