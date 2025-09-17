@@ -6,6 +6,28 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 import gspread
 import json
+import random
+import time
+
+from gspread.exceptions import APIError
+
+
+def with_retries(func, *args, retries=5, backoff=2, **kwargs):
+    """
+    Run a gspread operation with retries on quota (429) errors.
+    Exponential backoff with jitter to spread out retries.
+    """
+    for attempt in range(1, retries + 1):
+        try:
+            return func(*args, **kwargs)
+        except APIError as e:
+            if "429" in str(e):
+                sleep_time = backoff ** attempt + random.uniform(0, 1)
+                print(f"[Retry {attempt}/{retries}] Quota exceeded. Sleeping {sleep_time:.1f}s")
+                time.sleep(sleep_time)
+            else:
+                raise
+    raise RuntimeError(f"Operation failed after {retries} retries due to quota errors")
 
 
 def aggregate_test_results(xml_directory):
@@ -322,11 +344,11 @@ def update_google_sheet_with_cumulative_data(client, csv_filename, project_name)
 
     # Execute batch updates for existing rows
     if batch_updates:
-        sheet.batch_update(batch_updates)
+        with_retries(sheet.batch_update, batch_updates)
 
     # Append new rows if there are any
     if new_rows:
-        sheet.append_rows(new_rows, value_input_option='USER_ENTERED')
+        with_retries(sheet.append_rows, new_rows, value_input_option='USER_ENTERED')
 
 
 def update_daily_totals_sheet(client, daily_totals, sheet_name, project_name):
