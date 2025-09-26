@@ -10,6 +10,7 @@ jobs:
         name: Ingest JUnit Reports for ${{ matrix.project.name }}
         runs-on: ubuntu-latest
         strategy:
+          max-parallel: 1
           matrix:
               project:
                   - name: "Fenix"
