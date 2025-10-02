@@ -342,13 +342,23 @@ def update_google_sheet_with_cumulative_data(client, csv_filename, project_name)
             ]
             new_rows.append(new_row)
 
-    # Execute batch updates for existing rows
+    # Execute batch updates for existing rows in chunks of 50
     if batch_updates:
-        with_retries(sheet.batch_update, batch_updates)
+        chunk_size = 50
+        for i in range(0, len(batch_updates), chunk_size):
+            chunk = batch_updates[i:i + chunk_size]
+            print(f"Updating chunk {i // chunk_size + 1} of {(len(batch_updates) + chunk_size - 1) // chunk_size} ({len(chunk)} rows)")
+            with_retries(sheet.batch_update, chunk)
+            time.sleep(2)  # 2 second pause between chunks
 
-    # Append new rows if there are any
+    # Append new rows if there are any, in chunks of 100
     if new_rows:
-        with_retries(sheet.append_rows, new_rows, value_input_option='USER_ENTERED')
+        chunk_size = 100
+        for i in range(0, len(new_rows), chunk_size):
+            chunk = new_rows[i:i + chunk_size]
+            print(f"Appending chunk {i // chunk_size + 1} of {(len(new_rows) + chunk_size - 1) // chunk_size} ({len(chunk)} rows)")
+            with_retries(sheet.append_rows, chunk, value_input_option='USER_ENTERED')
+            time.sleep(2)  # 2 second pause between chunks
 
 
 def update_daily_totals_sheet(client, daily_totals, sheet_name, project_name):
@@ -417,8 +427,15 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"[Warning] Failed to update trending sheet for {project_name}: {e}")
 
+    # Add delay between major operations
+    time.sleep(3)
+
     # Update Google Sheets with cumulative data
     update_google_sheet_with_cumulative_data(client, output_csv, project_name)
+
+    # Add delay between major operations
+    time.sleep(3)
+
     update_daily_totals_sheet(client, daily_totals, "Daily Totals", project_name)
 
     print(
