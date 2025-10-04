@@ -97,7 +97,8 @@ def append_daily_per_test_issues_only(
         ]])
 
     # Load all current rows
-    values = ws.get_all_values()  # includes header
+    values = with_retries(ws.get_all_values)  # includes header
+    time.sleep(1)  # Brief pause after read
 
     # 1) Remove duplicates for today's date+project
     if len(values) > 1:
@@ -105,19 +106,40 @@ def append_daily_per_test_issues_only(
             idx for idx, row in enumerate(values[1:], start=2)
             if len(row) >= 2 and row[0] == run_date and row[1] == project_name
         ]
-        for r in reversed(to_delete_today):
-            ws.delete_rows(r)
+        # Delete in chunks to avoid rapid-fire requests
+        if to_delete_today:
+            chunk_size = 10
+            for i in range(0, len(to_delete_today), chunk_size):
+                chunk = to_delete_today[i:i + chunk_size]
+                for r in reversed(chunk):
+                    with_retries(ws.delete_rows, r)
+                time.sleep(2)  # Pause after each chunk
+
+    # Brief pause before next read operation
+    time.sleep(2)
 
     # 2) Prune rows older than the 7-day window
     if len(values) > 1:
         cutoff = (datetime.utcnow() - timedelta(days=keep_days)).strftime("%Y-%m-%d")
-        values_after_dupe_check = ws.get_all_values()[1:]  # after dupe deletion
+        values_after_dupe_check = with_retries(ws.get_all_values)  # after dupe deletion
+        time.sleep(1)  # Brief pause after read
+        values_after_dupe_check = values_after_dupe_check[1:]  # skip header
+
         to_delete_old = [
             idx for idx, row in enumerate(values_after_dupe_check, start=2)
             if len(row) >= 1 and row[0] < cutoff
         ]
-        for r in reversed(to_delete_old):
-            ws.delete_rows(r)
+        # Delete in chunks to avoid rapid-fire requests
+        if to_delete_old:
+            chunk_size = 10
+            for i in range(0, len(to_delete_old), chunk_size):
+                chunk = to_delete_old[i:i + chunk_size]
+                for r in reversed(chunk):
+                    with_retries(ws.delete_rows, r)
+                time.sleep(2)  # Pause after each chunk
+
+    # Brief pause before append operation
+    time.sleep(2)
 
     # 3) Append today's issue rows
     out_rows = []
@@ -136,7 +158,8 @@ def append_daily_per_test_issues_only(
             ])
 
     if out_rows:
-        ws.append_rows(out_rows, value_input_option="USER_ENTERED")
+        with_retries(ws.append_rows, out_rows, value_input_option="USER_ENTERED")
+        time.sleep(2)  # Pause after write
 
 
 def calculate_rates(test_data):
