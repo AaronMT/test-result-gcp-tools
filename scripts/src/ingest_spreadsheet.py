@@ -387,6 +387,7 @@ def update_google_sheet_with_cumulative_data(client, csv_filename, project_name)
 def update_daily_totals_sheet(client, daily_totals, sheet_name, project_name):
     # Open the worksheet for daily totals
     sheet = client.open("Fenix and Focus - Automated Flaky & Failure Tracking").worksheet(sheet_name)
+    time.sleep(1)  # Brief pause after opening the sheet
 
     # Check if headers exist; if not, add them
     headers = [
@@ -398,8 +399,11 @@ def update_daily_totals_sheet(client, daily_totals, sheet_name, project_name):
         "Flaky Rate",
         "Failure Rate",
     ]
-    if not sheet.row_values(1):
-        sheet.append_row(headers)
+
+    first_row = with_retries(lambda: sheet.row_values(1))
+    if not first_row:
+        with_retries(lambda: sheet.append_row(headers))
+        time.sleep(1)  # Brief pause after writing headers
 
     # Append the daily totals
     row_data = [
@@ -411,7 +415,7 @@ def update_daily_totals_sheet(client, daily_totals, sheet_name, project_name):
         daily_totals["Flaky Rate"],
         daily_totals["Failure Rate"],
     ]
-    sheet.append_row(row_data)
+    with_retries(lambda: sheet.append_row(row_data))
 
 
 if __name__ == "__main__":
