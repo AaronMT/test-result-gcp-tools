@@ -112,7 +112,7 @@ def append_daily_per_test_issues_only(
             for i in range(0, len(to_delete_today), chunk_size):
                 chunk = to_delete_today[i:i + chunk_size]
                 for r in reversed(chunk):
-                    with_retries(ws.delete_rows, r)
+                    with_retries(lambda: ws.delete_rows(r))
                 time.sleep(2)  # Pause after each chunk
 
     # Brief pause before next read operation
@@ -135,7 +135,7 @@ def append_daily_per_test_issues_only(
             for i in range(0, len(to_delete_old), chunk_size):
                 chunk = to_delete_old[i:i + chunk_size]
                 for r in reversed(chunk):
-                    with_retries(ws.delete_rows, r)
+                    with_retries(lambda: ws.delete_rows(r))
                 time.sleep(2)  # Pause after each chunk
 
     # Brief pause before append operation
@@ -158,7 +158,7 @@ def append_daily_per_test_issues_only(
             ])
 
     if out_rows:
-        with_retries(ws.append_rows, out_rows, value_input_option="USER_ENTERED")
+        with_retries(lambda: ws.append_rows(out_rows, value_input_option="USER_ENTERED"))
         time.sleep(2)  # Pause after write
 
 
@@ -371,7 +371,7 @@ def update_google_sheet_with_cumulative_data(client, csv_filename, project_name)
         for i in range(0, len(batch_updates), chunk_size):
             chunk = batch_updates[i:i + chunk_size]
             print(f"Updating chunk {i // chunk_size + 1} of {(len(batch_updates) + chunk_size - 1) // chunk_size} ({len(chunk)} rows)")
-            with_retries(sheet.batch_update, chunk)
+            with_retries(lambda: sheet.batch_update(chunk))
             time.sleep(2)  # 2 second pause between chunks
 
     # Append new rows if there are any, in chunks of 100
@@ -380,7 +380,7 @@ def update_google_sheet_with_cumulative_data(client, csv_filename, project_name)
         for i in range(0, len(new_rows), chunk_size):
             chunk = new_rows[i:i + chunk_size]
             print(f"Appending chunk {i // chunk_size + 1} of {(len(new_rows) + chunk_size - 1) // chunk_size} ({len(chunk)} rows)")
-            with_retries(sheet.append_rows, chunk, value_input_option='USER_ENTERED')
+            with_retries(lambda: sheet.append_rows(chunk, value_input_option='USER_ENTERED'))
             time.sleep(2)  # 2 second pause between chunks
 
 
