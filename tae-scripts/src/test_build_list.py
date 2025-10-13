@@ -1,3 +1,4 @@
+import os
 import requests
 import re
 import json
@@ -9,6 +10,8 @@ API_URL = f'https://api.github.com/repos/{OWNER}/{REPO}/contents/mobile/android/
 HEADERS = {
     'Accept': 'application/vnd.github.v3+json',
 }
+
+GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN', '')
 
 if GITHUB_TOKEN:
     HEADERS['Authorization'] = f'token {GITHUB_TOKEN}'
