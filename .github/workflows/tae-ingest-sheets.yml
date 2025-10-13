@@ -24,6 +24,8 @@ jobs:
           pip install -r tae-scripts/requirements.txt
 
       - name: Run test_build_list.py
+        env: 
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python tae-scripts/src/test_build_list.py
 
       - name: Run durations.py

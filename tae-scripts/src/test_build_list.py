@@ -10,6 +10,8 @@ HEADERS = {
     'Accept': 'application/vnd.github.v3+json',
 }
 
+if GITHUB_TOKEN:
+    HEADERS['Authorization'] = f'token {GITHUB_TOKEN}'
 
 def get_kotlin_test_files(path_url=API_URL):
     kotlin_files = []
