@@ -4,7 +4,7 @@ charset-normalizer==3.4.3
 google-api-core==2.25.2
 google-auth==2.41.1
 google-cloud-core==2.4.3
-google-cloud-storage==3.4.0
+google-cloud-storage==3.4.1
 google-crc32c==1.7.1
 google-resumable-media==2.7.2
 googleapis-common-protos==1.70.0
