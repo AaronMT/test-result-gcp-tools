@@ -52,7 +52,7 @@ jobs:
                   echo "ZIP_FILE=$ZIP_FILE" >> $GITHUB_ENV
             - name: Upload artifact
               if: steps.check_for_reports.outputs.has_reports == 'true'
-              uses: actions/upload-artifact@v4.6.2
+              uses: actions/upload-artifact@v5.0.0
               with:
                 name: crash-reports-${{ matrix.project.name }}
                 path: ${{ env.ZIP_FILE }}
@@ -201,7 +201,7 @@ jobs:
 
             - name: Upload processed crash reports as a Github artifact
               if: steps.process_minidumps.outputs.crash_stack_processed == 'true'
-              uses: actions/upload-artifact@v4.6.2
+              uses: actions/upload-artifact@v5.0.0
               with:
                 name: processed-crash-reports
                 path: processed_crash_reports/
