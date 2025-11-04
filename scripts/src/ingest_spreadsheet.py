@@ -3,7 +3,7 @@ import glob
 import csv
 from junitparser import JUnitXml, Failure
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import gspread
 import json
 import random
@@ -12,17 +12,26 @@ import time
 from gspread.exceptions import APIError
 
 
-def with_retries(func, *args, retries=5, backoff=2, **kwargs):
+def with_retries(func, *args, retries=10, backoff=3, max_sleep=120, **kwargs):
     """
     Run a gspread operation with retries on quota (429) errors.
     Exponential backoff with jitter to spread out retries.
+    
+    Args:
+        func: Function to execute
+        retries: Maximum number of retry attempts (default: 10)
+        backoff: Base backoff multiplier (default: 3)
+        max_sleep: Maximum sleep time in seconds (default: 120)
     """
     for attempt in range(1, retries + 1):
         try:
             return func(*args, **kwargs)
         except APIError as e:
             if "429" in str(e):
-                sleep_time = backoff ** attempt + random.uniform(0, 1)
+                if attempt == retries:
+                    raise RuntimeError(f"Operation failed after {retries} retries due to quota errors")
+                # Cap sleep time to avoid extremely long waits
+                sleep_time = min(backoff ** attempt + random.uniform(0, 2), max_sleep)
                 print(f"[Retry {attempt}/{retries}] Quota exceeded. Sleeping {sleep_time:.1f}s")
                 time.sleep(sleep_time)
             else:
@@ -81,7 +90,7 @@ def append_daily_per_test_issues_only(
     - Removes existing rows for the given date+project (avoid duplicates)
     - Keeps only the last 7 days of data (rolling window)
     """
-    run_date = run_date or (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d")
+    run_date = run_date or (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
     sheet_title = sheet_title or f"Trending Results - {project_name}"
     keep_days = 7  # rolling window length
 
@@ -95,10 +104,11 @@ def append_daily_per_test_issues_only(
             "date", "project_name", "class_name", "test_name",
             "total_runs", "flaky_runs", "failed_runs"
         ]])
+        time.sleep(2)
 
     # Load all current rows
     values = with_retries(ws.get_all_values)  # includes header
-    time.sleep(1)  # Brief pause after read
+    time.sleep(2)  # Increased pause after read
 
     # 1) Remove duplicates for today's date+project
     if len(values) > 1:
@@ -106,40 +116,40 @@ def append_daily_per_test_issues_only(
             idx for idx, row in enumerate(values[1:], start=2)
             if len(row) >= 2 and row[0] == run_date and row[1] == project_name
         ]
-        # Delete in chunks to avoid rapid-fire requests
+        # Delete in smaller chunks to reduce API load
         if to_delete_today:
-            chunk_size = 10
+            chunk_size = 5  # Reduced from 10
             for i in range(0, len(to_delete_today), chunk_size):
                 chunk = to_delete_today[i:i + chunk_size]
                 for r in reversed(chunk):
                     with_retries(lambda: ws.delete_rows(r))
-                time.sleep(2)  # Pause after each chunk
+                time.sleep(3)  # Increased pause after each chunk
 
-    # Brief pause before next read operation
-    time.sleep(2)
+    # Longer pause before next read operation
+    time.sleep(3)
 
     # 2) Prune rows older than the 7-day window
     if len(values) > 1:
-        cutoff = (datetime.utcnow() - timedelta(days=keep_days)).strftime("%Y-%m-%d")
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=keep_days)).strftime("%Y-%m-%d")
         values_after_dupe_check = with_retries(ws.get_all_values)  # after dupe deletion
-        time.sleep(1)  # Brief pause after read
+        time.sleep(2)  # Brief pause after read
         values_after_dupe_check = values_after_dupe_check[1:]  # skip header
 
         to_delete_old = [
             idx for idx, row in enumerate(values_after_dupe_check, start=2)
             if len(row) >= 1 and row[0] < cutoff
         ]
-        # Delete in chunks to avoid rapid-fire requests
+        # Delete in smaller chunks
         if to_delete_old:
-            chunk_size = 10
+            chunk_size = 5  # Reduced from 10
             for i in range(0, len(to_delete_old), chunk_size):
                 chunk = to_delete_old[i:i + chunk_size]
                 for r in reversed(chunk):
                     with_retries(lambda: ws.delete_rows(r))
-                time.sleep(2)  # Pause after each chunk
+                time.sleep(3)  # Increased pause after each chunk
 
-    # Brief pause before append operation
-    time.sleep(2)
+    # Longer pause before append operation
+    time.sleep(3)
 
     # 3) Append today's issue rows
     out_rows = []
@@ -158,8 +168,13 @@ def append_daily_per_test_issues_only(
             ])
 
     if out_rows:
-        with_retries(lambda: ws.append_rows(out_rows, value_input_option="USER_ENTERED"))
-        time.sleep(2)  # Pause after write
+        # Append in smaller chunks
+        chunk_size = 50  # Reduced from larger batches
+        for i in range(0, len(out_rows), chunk_size):
+            chunk = out_rows[i:i + chunk_size]
+            print(f"Appending chunk {i // chunk_size + 1} of {(len(out_rows) + chunk_size - 1) // chunk_size} ({len(chunk)} rows)")
+            with_retries(lambda: ws.append_rows(chunk, value_input_option="USER_ENTERED"))
+            time.sleep(3)  # Increased pause after write
 
 
 def calculate_rates(test_data):
@@ -216,7 +231,7 @@ def calculate_overall_totals(aggregated_results):
     overall_failure_rate = total_failed_runs / total_runs if total_runs else 0
 
     return {
-        "Date": datetime.utcnow().strftime("%Y-%m-%d"),
+        "Date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         "Total Runs": total_runs,
         "Flaky Runs": total_flaky_runs,
         "Failed Runs": total_failed_runs,
@@ -288,14 +303,19 @@ def update_google_sheet_with_cumulative_data(client, csv_filename, project_name)
         sheet = client.open("Fenix and Focus - Automated Flaky & Failure Tracking").worksheet(sheet_title)
     except gspread.exceptions.WorksheetNotFound:
         sheet = client.open("Fenix and Focus - Automated Flaky & Failure Tracking").add_worksheet(title=sheet_title, rows="1000", cols="7")
+        time.sleep(2)
 
     # Check if the first row (headers) exists; if not, add them
-    if not sheet.row_values(1):  # If the first row is empty, add headers
+    first_row = with_retries(lambda: sheet.row_values(1))
+    if not first_row:  # If the first row is empty, add headers
         headers = ["Class Name", "Test Name", "Total Runs", "Flaky Runs", "Failed Runs", "Flaky Rate", "Failure Rate"]
-        sheet.append_row(headers)
+        with_retries(lambda: sheet.append_row(headers))
+        time.sleep(2)
 
     # Read existing data from the sheet
-    existing_records = sheet.get_all_records()
+    existing_records = with_retries(lambda: sheet.get_all_records())
+    time.sleep(2)
+    
     existing_data = {}
     for idx, record in enumerate(existing_records, start=2):  # Start at row 2 because row 1 contains headers
         test_id = f"{record['Class Name']}.{record['Test Name']}"
@@ -365,29 +385,29 @@ def update_google_sheet_with_cumulative_data(client, csv_filename, project_name)
             ]
             new_rows.append(new_row)
 
-    # Execute batch updates for existing rows in chunks of 50
+    # Execute batch updates for existing rows in smaller chunks
     if batch_updates:
-        chunk_size = 50
+        chunk_size = 25  # Reduced from 50 to minimize quota pressure
         for i in range(0, len(batch_updates), chunk_size):
             chunk = batch_updates[i:i + chunk_size]
             print(f"Updating chunk {i // chunk_size + 1} of {(len(batch_updates) + chunk_size - 1) // chunk_size} ({len(chunk)} rows)")
             with_retries(lambda: sheet.batch_update(chunk))
-            time.sleep(2)  # 2 second pause between chunks
+            time.sleep(4)  # Increased from 2 seconds to 4 seconds
 
-    # Append new rows if there are any, in chunks of 100
+    # Append new rows if there are any, in smaller chunks
     if new_rows:
-        chunk_size = 100
+        chunk_size = 50  # Reduced from 100
         for i in range(0, len(new_rows), chunk_size):
             chunk = new_rows[i:i + chunk_size]
             print(f"Appending chunk {i // chunk_size + 1} of {(len(new_rows) + chunk_size - 1) // chunk_size} ({len(chunk)} rows)")
             with_retries(lambda: sheet.append_rows(chunk, value_input_option='USER_ENTERED'))
-            time.sleep(2)  # 2 second pause between chunks
+            time.sleep(4)  # Increased from 2 seconds to 4 seconds
 
 
 def update_daily_totals_sheet(client, daily_totals, sheet_name, project_name):
     # Open the worksheet for daily totals
     sheet = client.open("Fenix and Focus - Automated Flaky & Failure Tracking").worksheet(sheet_name)
-    time.sleep(1)  # Brief pause after opening the sheet
+    time.sleep(2)  # Increased pause after opening the sheet
 
     # Check if headers exist; if not, add them
     headers = [
@@ -403,7 +423,7 @@ def update_daily_totals_sheet(client, daily_totals, sheet_name, project_name):
     first_row = with_retries(lambda: sheet.row_values(1))
     if not first_row:
         with_retries(lambda: sheet.append_row(headers))
-        time.sleep(1)  # Brief pause after writing headers
+        time.sleep(2)  # Increased pause after writing headers
 
     # Append the daily totals
     row_data = [
@@ -416,6 +436,7 @@ def update_daily_totals_sheet(client, daily_totals, sheet_name, project_name):
         daily_totals["Failure Rate"],
     ]
     with_retries(lambda: sheet.append_row(row_data))
+    time.sleep(2)
 
 
 if __name__ == "__main__":
@@ -441,9 +462,10 @@ if __name__ == "__main__":
     client = authenticate_google_sheets()
 
     # Append daily issues to the per-project worksheet
-    run_date = os.environ.get("RUN_DATE") or (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d")
+    run_date = os.environ.get("RUN_DATE") or (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
 
     try:
+        print(f"Updating trending sheet for {project_name}...")
         append_daily_per_test_issues_only(
             client=client,
             aggregated_results=aggregated_results,
@@ -451,19 +473,24 @@ if __name__ == "__main__":
             run_date=run_date,
             sheet_title=f"Trending Results - {project_name}",
         )
+        print(f"Successfully updated trending sheet for {project_name}")
     except Exception as e:
         print(f"[Warning] Failed to update trending sheet for {project_name}: {e}")
 
-    # Add delay between major operations
-    time.sleep(3)
+    # Add longer delay between major operations
+    time.sleep(5)
 
     # Update Google Sheets with cumulative data
+    print(f"Updating cumulative data sheet for {project_name}...")
     update_google_sheet_with_cumulative_data(client, output_csv, project_name)
+    print(f"Successfully updated cumulative data sheet for {project_name}")
 
-    # Add delay between major operations
-    time.sleep(3)
+    # Add longer delay between major operations
+    time.sleep(5)
 
+    print(f"Updating daily totals sheet for {project_name}...")
     update_daily_totals_sheet(client, daily_totals, "Daily Totals", project_name)
+    print(f"Successfully updated daily totals sheet for {project_name}")
 
     print(
         f"Aggregated test results have been written to {output_csv}, daily totals written to {daily_totals_csv}, and Google Sheets updated with cumulative data."
