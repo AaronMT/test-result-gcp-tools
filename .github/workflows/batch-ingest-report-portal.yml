@@ -24,7 +24,7 @@ jobs:
                     report_portal_project_name: "REPORT_PORTAL_PROJECT_NAME_B"
         steps:
             - name: Checkout the repository
-              uses: actions/checkout@v6.0.0
+              uses: actions/checkout@v6.0.1
             - name: Authenticate with Google Cloud
               uses: google-github-actions/auth@v3.0.0
               with:
