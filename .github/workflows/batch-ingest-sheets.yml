@@ -83,12 +83,12 @@ jobs:
               run: |
                 python scripts/src/ingest_spreadsheet.py junit_reports
             - name: Upload reports artifact
-              uses: actions/upload-artifact@v5.0.0
+              uses: actions/upload-artifact@v6.0.0
               with:
                 name: junit-xml-reports-${{ matrix.project.name }}
                 path: ${{ env.ZIP_FILE }}
             - name: Upload CSV artifacts
-              uses: actions/upload-artifact@v5.0.0
+              uses: actions/upload-artifact@v6.0.0
               with:
                 name: junit-xml-reports-${{ matrix.project.name }}-csv
                 path: |
