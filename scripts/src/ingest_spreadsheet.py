@@ -435,7 +435,7 @@ def update_daily_totals_sheet(client, daily_totals, sheet_name, project_name):
         daily_totals["Flaky Rate"],
         daily_totals["Failure Rate"],
     ]
-    with_retries(lambda: sheet.append_row(row_data))
+    with_retries(lambda: sheet.append_row(row_data, table_range='A:G', value_input_option='USER_ENTERED'))
     time.sleep(2)
 
 
