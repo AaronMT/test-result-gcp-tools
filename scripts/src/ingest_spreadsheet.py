@@ -422,12 +422,17 @@ def update_daily_totals_sheet(client, daily_totals, sheet_name, project_name):
 
     first_row = with_retries(lambda: sheet.row_values(1))
     if not first_row:
-        with_retries(lambda: sheet.append_row(headers))
+        with_retries(lambda: sheet.update("A1:G1", [headers], value_input_option="USER_ENTERED"))
         time.sleep(2)  # Increased pause after writing headers
 
-    # Append the daily totals
+    # Determine the date to use for the upsert
+    run_date = os.environ.get("RUN_DATE")
+    if not run_date:
+        run_date = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+
+    # Prepare the row data
     row_data = [
-        daily_totals["Date"],
+        run_date,
         project_name,
         daily_totals["Total Runs"],
         daily_totals["Flaky Runs"],
@@ -435,8 +440,28 @@ def update_daily_totals_sheet(client, daily_totals, sheet_name, project_name):
         daily_totals["Flaky Rate"],
         daily_totals["Failure Rate"],
     ]
-    with_retries(lambda: sheet.append_row(row_data))
+
+    # Read existing key columns (Date and Project Name) to check for duplicates
+    existing_data = with_retries(lambda: sheet.get_all_values())
     time.sleep(2)
+
+    # Find if a row with matching (Date, Project Name) exists
+    matching_row_index = None
+    for idx, row in enumerate(existing_data[1:], start=2):  # Skip header row
+        if len(row) >= 2 and row[0] == run_date and row[1] == project_name:
+            matching_row_index = idx
+            break
+
+    if matching_row_index:
+        # Update existing row
+        print(f"Updating existing row {matching_row_index} for Date={run_date}, Project={project_name}")
+        with_retries(lambda: sheet.update(f"A{matching_row_index}:G{matching_row_index}", [row_data], value_input_option="USER_ENTERED"))
+        time.sleep(2)
+    else:
+        # Append new row
+        print(f"Appending new row for Date={run_date}, Project={project_name}")
+        with_retries(lambda: sheet.append_row(row_data, value_input_option="USER_ENTERED"))
+        time.sleep(2)
 
 
 if __name__ == "__main__":
