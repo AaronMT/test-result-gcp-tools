@@ -425,7 +425,29 @@ def update_daily_totals_sheet(client, daily_totals, sheet_name, project_name):
         with_retries(lambda: sheet.append_row(headers))
         time.sleep(2)  # Increased pause after writing headers
 
-    # Append the daily totals
+    # Get columns A and B to find the last non-empty row with actual data
+    col_a_values = with_retries(lambda: sheet.col_values(1))  # Column A (Date)
+    col_b_values = with_retries(lambda: sheet.col_values(2))  # Column B (Project Name)
+    time.sleep(2)
+    
+    # Find the last row where both Date (A) and Project Name (B) have values
+    last_data_row = 0
+    for i in range(len(col_a_values) - 1, -1, -1):  # Iterate backwards
+        # Check if both Date and Project Name have values
+        if i < len(col_b_values) and col_a_values[i].strip() and col_b_values[i].strip():
+            last_data_row = i + 1  # row numbers are 1-indexed
+            break
+    
+    # If no data rows found (only header or empty), start at row 2
+    if last_data_row <= 1:
+        last_data_row = 1  # Header row
+    
+    # The next available row is one after the last non-empty row
+    next_row = last_data_row + 1
+    
+    print(f"[{project_name}] Last data row: {last_data_row}, writing to row {next_row}")
+    
+    # Prepare the row data
     row_data = [
         daily_totals["Date"],
         project_name,
@@ -435,7 +457,11 @@ def update_daily_totals_sheet(client, daily_totals, sheet_name, project_name):
         daily_totals["Flaky Rate"],
         daily_totals["Failure Rate"],
     ]
-    with_retries(lambda: sheet.append_row(row_data))
+    
+    # Use update to write to a specific row range
+    # This will expand the table automatically and avoid overwriting
+    range_name = f"A{next_row}:G{next_row}"
+    with_retries(lambda: sheet.update(range_name, [row_data], value_input_option='USER_ENTERED'))
     time.sleep(2)
 
 
