@@ -233,6 +233,19 @@ def get_run_date():
     return run_date
 
 
+def get_column_letter(col_num):
+    """
+    Convert a column number (1-indexed) to a spreadsheet column letter.
+    Examples: 1->A, 7->G, 26->Z, 27->AA
+    """
+    result = ""
+    while col_num > 0:
+        col_num -= 1
+        result = chr(ord('A') + (col_num % 26)) + result
+        col_num //= 26
+    return result
+
+
 def calculate_overall_totals(aggregated_results, run_date):
     total_runs = sum(int(result["Total Runs"]) for result in aggregated_results)
     total_flaky_runs = sum(int(result["Flaky Runs"]) for result in aggregated_results)
@@ -434,7 +447,7 @@ def update_daily_totals_sheet(client, daily_totals, sheet_name, project_name):
     first_row = with_retries(lambda: sheet.row_values(1))
     if not first_row:
         # Calculate dynamic range based on headers length
-        end_col = chr(ord("A") + len(headers) - 1)
+        end_col = get_column_letter(len(headers))
         with_retries(lambda: sheet.update(f"A1:{end_col}1", [headers], value_input_option="USER_ENTERED"))
         time.sleep(2)  # Increased pause after writing headers
 
@@ -465,7 +478,7 @@ def update_daily_totals_sheet(client, daily_totals, sheet_name, project_name):
 
     if matching_row_index:
         # Update existing row - use dynamic range based on row_data length
-        end_col = chr(ord("A") + len(row_data) - 1)
+        end_col = get_column_letter(len(row_data))
         print(f"Updating existing row {matching_row_index} for Date={run_date}, Project={project_name}")
         with_retries(lambda: sheet.update(f"A{matching_row_index}:{end_col}{matching_row_index}", [row_data], value_input_option="USER_ENTERED"))
         time.sleep(2)
