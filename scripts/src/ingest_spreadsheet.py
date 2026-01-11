@@ -460,7 +460,9 @@ def update_daily_totals_sheet(client, daily_totals, sheet_name, project_name):
     
     # Use update to write to a specific row range
     # This will expand the table automatically and avoid overwriting
-    range_name = f"A{next_row}:G{next_row}"
+    # Calculate the end column dynamically based on row_data length
+    end_column = chr(ord('A') + len(row_data) - 1)
+    range_name = f"A{next_row}:{end_column}{next_row}"
     with_retries(lambda: sheet.update(range_name, [row_data], value_input_option='USER_ENTERED'))
     time.sleep(2)
 
