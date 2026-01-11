@@ -113,77 +113,30 @@ jobs:
                   echo "daily_totals.csv not found, skipping conversion."
                 fi
               shell: bash
-            - name: Upload daily_totals.csv to BigQuery (staging + MERGE upsert)
+            - name: Upload CSVs to BigQuery
               if: success()
               run: |
-                set -euo pipefail
-
+                # Switch projects to BigQuery host project
                 gcloud config set project ${{ secrets.BQ_PROJECT_ID }}
 
-                declare -A prod_tables
-                prod_tables["Fenix"]="testops_stats.fenix_daily_android"
-                prod_tables["Focus"]="testops_stats.focus_daily_android"
+                declare -A projects
+                projects["Fenix"]="testops_stats.fenix_daily_android"
+                projects["Focus"]="testops_stats.focus_daily_android"
 
-                declare -A staging_tables
-                staging_tables["Fenix"]="testops_stats._staging_fenix_daily_android"
-                staging_tables["Focus"]="testops_stats._staging_focus_daily_android"
-
-                prod_table="${prod_tables[${{ matrix.project.name }}]}"
-                staging_table="${staging_tables[${{ matrix.project.name }}]}"
+                table=${projects[${{ matrix.project.name }}]}
                 csv_file="daily_totals.csv"
 
-                if [[ ! -f "$csv_file" ]]; then
-                  echo "No CSV file found for ${{ matrix.project.name }}. Skipping."
-                  exit 0
+                if [[ -f "$csv_file" ]]; then
+                  echo "Uploading $csv_file to $table"
+                  for attempt in {1..3}; do
+                    if bq load --project_id=${{ secrets.BQ_PROJECT_ID}} --apilog=log_${{ matrix.project.name }}.log --autodetect --source_format=CSV "$table" "$csv_file"; then
+                      echo "Upload successful!"
+                      break  # Exit loop on success
+                    fi
+                    echo "Upload failed, retrying in 10 seconds (Attempt $attempt of 3)..."
+                    sleep 10
+                  done
+                else
+                  echo "No CSV file found for ${{ matrix.project.name }}"
                 fi
-
-                echo "Project: ${{ matrix.project.name }}"
-                echo "Staging: $staging_table"
-                echo "Prod:    $prod_table"
-                echo "CSV:     $csv_file"
-
-                # 1) Load into staging (overwrite staging each run; skip header row)
-                bq load \
-                  --project_id=${{ secrets.BQ_PROJECT_ID }} \
-                  --autodetect \
-                  --source_format=CSV \
-                  --skip_leading_rows=1 \
-                  --replace \
-                  "$staging_table" \
-                  "$csv_file"
-
-                # 2) MERGE staging -> prod (idempotent on Date)
-                bq --project_id=${{ secrets.BQ_PROJECT_ID }} query --use_legacy_sql=false \
-                "MERGE \`${{ secrets.BQ_PROJECT_ID }}.${prod_table}\` T
-                 USING \`${{ secrets.BQ_PROJECT_ID }}.${staging_table}\` S
-                 ON T.Date = S.Date
-                 WHEN MATCHED THEN UPDATE SET
-                   \`Total Runs\`   = S.\`Total Runs\`,
-                   \`Flaky Runs\`   = S.\`Flaky Runs\`,
-                   \`Failed Runs\`  = S.\`Failed Runs\`,
-                   \`Flaky Rate\`   = S.\`Flaky Rate\`,
-                   \`Failure Rate\` = S.\`Failure Rate\`
-                 WHEN NOT MATCHED THEN INSERT (
-                   Date, \`Total Runs\`, \`Flaky Runs\`, \`Failed Runs\`, \`Flaky Rate\`, \`Failure Rate\`
-                 ) VALUES (
-                   S.Date, S.\`Total Runs\`, S.\`Flaky Runs\`, S.\`Failed Runs\`, S.\`Flaky Rate\`, S.\`Failure Rate\`
-                 );"
-
-                # 3) Guardrail: fail if duplicates exist
-                echo "Checking for duplicate Dates in prod table..."
-                dup_count=$(bq --project_id=${{ secrets.BQ_PROJECT_ID }} query --use_legacy_sql=false --format=csv \
-                  "SELECT COUNT(1)
-                   FROM (
-                     SELECT Date
-                     FROM \`${{ secrets.BQ_PROJECT_ID }}.${prod_table}\`
-                     GROUP BY Date
-                     HAVING COUNT(*) > 1
-                   )" | tail -n 1)
-
-                if [[ ${dup_count} -ne 0 ]]; then
-                  echo "ERROR: Duplicate Dates detected in ${prod_table} (count=${dup_count})."
-                  exit 1
-                fi
-
-                echo "Done. No duplicates detected."
               shell: bash
