@@ -425,7 +425,7 @@ def update_daily_totals_sheet(client, daily_totals, sheet_name, project_name):
         with_retries(lambda: sheet.append_row(headers))
         time.sleep(2)  # Increased pause after writing headers
 
-    # Append the daily totals
+    # Prepare the row data
     row_data = [
         daily_totals["Date"],
         project_name,
@@ -435,7 +435,38 @@ def update_daily_totals_sheet(client, daily_totals, sheet_name, project_name):
         daily_totals["Flaky Rate"],
         daily_totals["Failure Rate"],
     ]
-    with_retries(lambda: sheet.append_row(row_data))
+
+    # Read columns A (Date) and B (Project Name) to find existing row or determine next row
+    col_a_values = with_retries(lambda: sheet.col_values(1))  # Column A (Date)
+    col_b_values = with_retries(lambda: sheet.col_values(2))  # Column B (Project Name)
+    time.sleep(2)  # Pause after reading
+
+    target_row = None
+    last_data_row = 1  # Initialize to 1 (header row number) for 1-based row numbering
+    
+    # Find existing row matching (Date, Project Name) or determine last data row
+    # col_values returns a list where index 0 = row 1, index 1 = row 2, etc.
+    # Start at index 1 to skip the header row
+    num_rows = max(len(col_a_values), len(col_b_values))
+    for i in range(1, num_rows):
+        col_a_val = col_a_values[i] if i < len(col_a_values) else ""
+        col_b_val = col_b_values[i] if i < len(col_b_values) else ""
+        
+        # Track last row where both A and B are non-empty
+        if col_a_val and col_b_val:
+            last_data_row = i + 1  # Convert from 0-based array index to 1-based row number
+            
+        # Check if this row matches our (Date, Project Name)
+        if col_a_val == daily_totals["Date"] and col_b_val == project_name:
+            target_row = i + 1  # Convert from 0-based array index to 1-based row number
+            break
+    
+    # If no existing row found, use next row after last data row
+    if target_row is None:
+        target_row = last_data_row + 1
+    
+    # Update the target row using range notation
+    with_retries(lambda: sheet.update(f"A{target_row}:G{target_row}", [row_data], value_input_option="USER_ENTERED"))
     time.sleep(2)
 
 
