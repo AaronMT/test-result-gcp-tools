@@ -442,20 +442,23 @@ def update_daily_totals_sheet(client, daily_totals, sheet_name, project_name):
     time.sleep(2)  # Pause after reading
 
     target_row = None
-    last_data_row = 1  # Start with header row
+    last_data_row = 1  # Initialize to header row index
     
     # Find existing row matching (Date, Project Name) or determine last data row
-    for i in range(1, max(len(col_a_values), len(col_b_values))):
+    # col_values returns a list where index 0 = row 1, index 1 = row 2, etc.
+    # Start at index 1 to skip the header row
+    num_rows = max(len(col_a_values), len(col_b_values))
+    for i in range(1, num_rows):
         col_a_val = col_a_values[i] if i < len(col_a_values) else ""
         col_b_val = col_b_values[i] if i < len(col_b_values) else ""
         
         # Track last row where both A and B are non-empty
         if col_a_val and col_b_val:
-            last_data_row = i + 1  # Convert from 0-indexed to 1-indexed row number
+            last_data_row = i + 1  # Convert from 0-based array index to 1-based row number
             
         # Check if this row matches our (Date, Project Name)
         if col_a_val == daily_totals["Date"] and col_b_val == project_name:
-            target_row = i + 1  # Convert from 0-indexed to 1-indexed row number
+            target_row = i + 1  # Convert from 0-based array index to 1-based row number
             break
     
     # If no existing row found, use next row after last data row
