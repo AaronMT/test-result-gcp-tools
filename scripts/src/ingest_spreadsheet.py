@@ -222,7 +222,17 @@ def write_aggregated_results_to_csv(aggregated_results, filename):
             writer.writerow(result)
 
 
-def calculate_overall_totals(aggregated_results):
+def calculate_overall_totals(aggregated_results, run_date=None):
+    """
+    Calculate overall totals from aggregated results.
+    
+    Args:
+        aggregated_results: List of test results
+        run_date: Date string in YYYY-MM-DD format. If None, defaults to yesterday.
+    """
+    if run_date is None:
+        run_date = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    
     total_runs = sum(int(result["Total Runs"]) for result in aggregated_results)
     total_flaky_runs = sum(int(result["Flaky Runs"]) for result in aggregated_results)
     total_failed_runs = sum(int(result["Failed Runs"]) for result in aggregated_results)
@@ -231,7 +241,7 @@ def calculate_overall_totals(aggregated_results):
     overall_failure_rate = total_failed_runs / total_runs if total_runs else 0
 
     return {
-        "Date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "Date": run_date,
         "Total Runs": total_runs,
         "Flaky Runs": total_flaky_runs,
         "Failed Runs": total_failed_runs,
@@ -405,9 +415,21 @@ def update_google_sheet_with_cumulative_data(client, csv_filename, project_name)
 
 
 def update_daily_totals_sheet(client, daily_totals, sheet_name, project_name):
+    """
+    Updates the Daily Totals sheet with upsert logic.
+    
+    If a row exists with matching (Date, Project Name), updates that row.
+    Otherwise appends a new row.
+    
+    Args:
+        client: gspread client
+        daily_totals: dict with Date, Total Runs, Flaky Runs, Failed Runs, Flaky Rate, Failure Rate
+        sheet_name: name of the worksheet
+        project_name: project name (Focus, Fenix, etc.)
+    """
     # Open the worksheet for daily totals
-    sheet = client.open("Fenix and Focus - Automated Flaky & Failure Tracking").worksheet(sheet_name)
-    time.sleep(2)  # Increased pause after opening the sheet
+    sheet = with_retries(lambda: client.open("Fenix and Focus - Automated Flaky & Failure Tracking").worksheet(sheet_name))
+    time.sleep(2)  # Pause after opening the sheet
 
     # Check if headers exist; if not, add them
     headers = [
@@ -423,9 +445,10 @@ def update_daily_totals_sheet(client, daily_totals, sheet_name, project_name):
     first_row = with_retries(lambda: sheet.row_values(1))
     if not first_row:
         with_retries(lambda: sheet.append_row(headers))
-        time.sleep(2)  # Increased pause after writing headers
+        time.sleep(2)  # Pause after writing headers
+        print(f"[Daily Totals] Created headers for {sheet_name}")
 
-    # Append the daily totals
+    # Prepare the row data
     row_data = [
         daily_totals["Date"],
         project_name,
@@ -435,7 +458,30 @@ def update_daily_totals_sheet(client, daily_totals, sheet_name, project_name):
         daily_totals["Flaky Rate"],
         daily_totals["Failure Rate"],
     ]
-    with_retries(lambda: sheet.append_row(row_data))
+    
+    # Read all existing data to check for duplicates
+    all_values = with_retries(lambda: sheet.get_all_values())
+    time.sleep(2)
+    
+    # Search for existing row with matching (Date, Project Name)
+    target_date = daily_totals["Date"]
+    existing_row_index = None
+    
+    for i, row in enumerate(all_values[1:], start=2):  # Skip header, start at row 2
+        if len(row) >= 2 and row[0] == target_date and row[1] == project_name:
+            existing_row_index = i
+            break
+    
+    if existing_row_index:
+        # Update existing row
+        range_notation = f"A{existing_row_index}:G{existing_row_index}"
+        with_retries(lambda: sheet.update(range_notation, [row_data], value_input_option="USER_ENTERED"))
+        print(f"[Daily Totals] Updated existing row {existing_row_index} for {project_name} on {target_date}")
+    else:
+        # Append new row
+        with_retries(lambda: sheet.append_row(row_data, value_input_option="USER_ENTERED"))
+        print(f"[Daily Totals] Appended new row for {project_name} on {target_date}")
+    
     time.sleep(2)
 
 
@@ -449,20 +495,20 @@ if __name__ == "__main__":
     test_data = aggregate_test_results(xml_directory)
     aggregated_results = calculate_rates(test_data)
 
+    # Determine run_date early (used for both trending and daily totals)
+    run_date = os.environ.get("RUN_DATE") or (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+
     # Write per-test aggregated results to CSV
     output_csv = "aggregated_test_results.csv"
     write_aggregated_results_to_csv(aggregated_results, output_csv)
 
-    # Calculate daily totals and write to CSV
-    daily_totals = calculate_overall_totals(aggregated_results)
+    # Calculate daily totals and write to CSV (using run_date)
+    daily_totals = calculate_overall_totals(aggregated_results, run_date=run_date)
     daily_totals_csv = "daily_totals.csv"
     write_daily_totals_to_csv(daily_totals, daily_totals_csv)
 
     # Authenticate once and pass client to update functions
     client = authenticate_google_sheets()
-
-    # Append daily issues to the per-project worksheet
-    run_date = os.environ.get("RUN_DATE") or (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
 
     try:
         print(f"Updating trending sheet for {project_name}...")
