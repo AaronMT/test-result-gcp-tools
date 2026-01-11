@@ -433,7 +433,9 @@ def update_daily_totals_sheet(client, daily_totals, sheet_name, project_name):
 
     first_row = with_retries(lambda: sheet.row_values(1))
     if not first_row:
-        with_retries(lambda: sheet.update("A1:G1", [headers], value_input_option="USER_ENTERED"))
+        # Calculate dynamic range based on headers length
+        end_col = chr(ord("A") + len(headers) - 1)
+        with_retries(lambda: sheet.update(f"A1:{end_col}1", [headers], value_input_option="USER_ENTERED"))
         time.sleep(2)  # Increased pause after writing headers
 
     # Determine the date to use for the upsert
@@ -462,9 +464,10 @@ def update_daily_totals_sheet(client, daily_totals, sheet_name, project_name):
             break
 
     if matching_row_index:
-        # Update existing row
+        # Update existing row - use dynamic range based on row_data length
+        end_col = chr(ord("A") + len(row_data) - 1)
         print(f"Updating existing row {matching_row_index} for Date={run_date}, Project={project_name}")
-        with_retries(lambda: sheet.update(f"A{matching_row_index}:G{matching_row_index}", [row_data], value_input_option="USER_ENTERED"))
+        with_retries(lambda: sheet.update(f"A{matching_row_index}:{end_col}{matching_row_index}", [row_data], value_input_option="USER_ENTERED"))
         time.sleep(2)
     else:
         # Append new row
