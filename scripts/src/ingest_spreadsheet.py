@@ -222,7 +222,18 @@ def write_aggregated_results_to_csv(aggregated_results, filename):
             writer.writerow(result)
 
 
-def calculate_overall_totals(aggregated_results):
+def get_run_date():
+    """
+    Determine the run date to use for reporting.
+    Prefers RUN_DATE environment variable if set, otherwise defaults to yesterday UTC.
+    """
+    run_date = os.environ.get("RUN_DATE")
+    if not run_date:
+        run_date = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    return run_date
+
+
+def calculate_overall_totals(aggregated_results, run_date):
     total_runs = sum(int(result["Total Runs"]) for result in aggregated_results)
     total_flaky_runs = sum(int(result["Flaky Runs"]) for result in aggregated_results)
     total_failed_runs = sum(int(result["Failed Runs"]) for result in aggregated_results)
@@ -231,7 +242,7 @@ def calculate_overall_totals(aggregated_results):
     overall_failure_rate = total_failed_runs / total_runs if total_runs else 0
 
     return {
-        "Date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "Date": run_date,
         "Total Runs": total_runs,
         "Flaky Runs": total_flaky_runs,
         "Failed Runs": total_failed_runs,
@@ -426,9 +437,7 @@ def update_daily_totals_sheet(client, daily_totals, sheet_name, project_name):
         time.sleep(2)  # Increased pause after writing headers
 
     # Determine the date to use for the upsert
-    run_date = os.environ.get("RUN_DATE")
-    if not run_date:
-        run_date = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    run_date = get_run_date()
 
     # Prepare the row data
     row_data = [
@@ -441,8 +450,8 @@ def update_daily_totals_sheet(client, daily_totals, sheet_name, project_name):
         daily_totals["Failure Rate"],
     ]
 
-    # Read existing key columns (Date and Project Name) to check for duplicates
-    existing_data = with_retries(lambda: sheet.get_all_values())
+    # Read only key columns (Date and Project Name) to check for duplicates
+    existing_data = with_retries(lambda: sheet.get_values("A:B"))
     time.sleep(2)
 
     # Find if a row with matching (Date, Project Name) exists
@@ -478,16 +487,16 @@ if __name__ == "__main__":
     output_csv = "aggregated_test_results.csv"
     write_aggregated_results_to_csv(aggregated_results, output_csv)
 
+    # Determine the run date once
+    run_date = get_run_date()
+
     # Calculate daily totals and write to CSV
-    daily_totals = calculate_overall_totals(aggregated_results)
+    daily_totals = calculate_overall_totals(aggregated_results, run_date)
     daily_totals_csv = "daily_totals.csv"
     write_daily_totals_to_csv(daily_totals, daily_totals_csv)
 
     # Authenticate once and pass client to update functions
     client = authenticate_google_sheets()
-
-    # Append daily issues to the per-project worksheet
-    run_date = os.environ.get("RUN_DATE") or (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
 
     try:
         print(f"Updating trending sheet for {project_name}...")
