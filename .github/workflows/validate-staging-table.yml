@@ -1,0 +1,103 @@
+name: Validate BigQuery Staging Table
+
+on:
+    workflow_dispatch:
+        inputs:
+            project:
+                description: 'Project to validate (Fenix or Focus)'
+                required: true
+                default: 'Fenix'
+                type: choice
+                options:
+                    - Fenix
+                    - Focus
+
+permissions:
+    contents: read
+
+jobs:
+    validate_staging:
+        name: Validate Staging Table for ${{ inputs.project }}
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout the repository
+              uses: actions/checkout@v6.0.1
+            - name: Authenticate with Google Cloud
+              uses: google-github-actions/auth@v3.0.0
+              with:
+                credentials_json: ${{ secrets.GCP_SA_KEY }}
+            - name: Set up Google Cloud SDK
+              uses: google-github-actions/setup-gcloud@v3.0.1
+              with:
+                project_id: ${{ secrets.GCP_PROJECT_ID }}
+            - name: Create test CSV
+              run: |
+                # Create a test CSV with sample data
+                cat > daily_totals.csv << 'EOF'
+                Date,Total Runs,Flaky Runs,Failed Runs,Flaky Rate,Failure Rate
+                2026-01-11,100,5,2,0.050000,0.020000
+                EOF
+                echo "Created test CSV:"
+                cat daily_totals.csv
+              shell: bash
+            - name: Load test data to staging table
+              run: |
+                set -euo pipefail
+
+                gcloud config set project ${{ secrets.BQ_PROJECT_ID }}
+
+                declare -A staging_tables
+                staging_tables["Fenix"]="testops_stats._staging_fenix_daily_android"
+                staging_tables["Focus"]="testops_stats._staging_focus_daily_android"
+
+                staging_table="${staging_tables[${{ inputs.project }}]}"
+                csv_file="daily_totals.csv"
+
+                echo "Project: ${{ inputs.project }}"
+                echo "Staging: $staging_table"
+                echo "CSV:     $csv_file"
+
+                # Load into staging (overwrite staging each run; skip header row)
+                bq load \
+                  --project_id=${{ secrets.BQ_PROJECT_ID }} \
+                  --autodetect \
+                  --source_format=CSV \
+                  --skip_leading_rows=1 \
+                  --replace \
+                  "$staging_table" \
+                  "$csv_file"
+
+                echo "Staging table load completed."
+              shell: bash
+            - name: Validate staging table data
+              run: |
+                set -euo pipefail
+
+                gcloud config set project ${{ secrets.BQ_PROJECT_ID }}
+
+                declare -A staging_tables
+                staging_tables["Fenix"]="testops_stats._staging_fenix_daily_android"
+                staging_tables["Focus"]="testops_stats._staging_focus_daily_android"
+
+                staging_table="${staging_tables[${{ inputs.project }}]}"
+
+                echo "Validating staging table: $staging_table"
+
+                # Query the staging table to verify data
+                echo "=== Staging Table Contents ==="
+                bq --project_id=${{ secrets.BQ_PROJECT_ID }} query --use_legacy_sql=false --format=pretty \
+                  "SELECT * FROM \`${{ secrets.BQ_PROJECT_ID }}.${staging_table}\`"
+
+                # Count rows in staging table
+                row_count=$(bq --project_id=${{ secrets.BQ_PROJECT_ID }} query --use_legacy_sql=false --format=csv \
+                  "SELECT COUNT(*) FROM \`${{ secrets.BQ_PROJECT_ID }}.${staging_table}\`" | tail -n 1)
+
+                echo "=== Row Count: ${row_count} ==="
+
+                if [[ ${row_count} -eq 0 ]]; then
+                  echo "ERROR: Staging table is empty!"
+                  exit 1
+                fi
+
+                echo "SUCCESS: Staging table contains ${row_count} row(s)."
+              shell: bash
