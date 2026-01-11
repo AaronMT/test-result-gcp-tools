@@ -432,9 +432,10 @@ def update_daily_totals_sheet(client, daily_totals, sheet_name, project_name):
     
     # Find the last row where both Date (A) and Project Name (B) have values
     last_data_row = 0
-    for i in range(len(col_a_values) - 1, -1, -1):  # Iterate backwards
+    min_length = min(len(col_a_values), len(col_b_values))
+    for i in range(min_length - 1, -1, -1):  # Iterate backwards through valid range
         # Check if both Date and Project Name have values
-        if i < len(col_b_values) and col_a_values[i].strip() and col_b_values[i].strip():
+        if col_a_values[i].strip() and col_b_values[i].strip():
             last_data_row = i + 1  # row numbers are 1-indexed
             break
     
