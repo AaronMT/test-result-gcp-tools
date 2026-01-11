@@ -442,7 +442,7 @@ def update_daily_totals_sheet(client, daily_totals, sheet_name, project_name):
     time.sleep(2)  # Pause after reading
 
     target_row = None
-    last_data_row = 1  # Initialize to header row index
+    last_data_row = 1  # Initialize to 1 (header row number) for 1-based row numbering
     
     # Find existing row matching (Date, Project Name) or determine last data row
     # col_values returns a list where index 0 = row 1, index 1 = row 2, etc.
