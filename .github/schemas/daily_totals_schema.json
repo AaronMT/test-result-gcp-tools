@@ -1,0 +1,32 @@
+[
+  {
+    "name": "Date",
+    "type": "DATE",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "Total Runs",
+    "type": "INTEGER",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "Flaky Runs",
+    "type": "INTEGER",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "Failed Runs",
+    "type": "INTEGER",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "Flaky Rate",
+    "type": "FLOAT",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "Failure Rate",
+    "type": "FLOAT",
+    "mode": "NULLABLE"
+  }
+]
