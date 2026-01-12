@@ -57,10 +57,16 @@ jobs:
                 echo "Staging: $staging_table"
                 echo "CSV:     $csv_file"
 
+                # Safety check: refuse to run bq load --replace on non-staging table
+                if [[ "$staging_table" != testops_stats._staging_* ]]; then
+                  echo "ERROR: Refusing to run bq load --replace on non-staging table: $staging_table"
+                  exit 1
+                fi
+
                 # Load into staging (overwrite staging each run; skip header row)
                 bq load \
                   --project_id=${{ secrets.BQ_PROJECT_ID }} \
-                  --autodetect \
+                  --schema=.github/schemas/daily_totals_schema.json \
                   --source_format=CSV \
                   --skip_leading_rows=1 \
                   --replace \
