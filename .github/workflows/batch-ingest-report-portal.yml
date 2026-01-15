@@ -33,6 +33,10 @@ jobs:
               uses: google-github-actions/setup-gcloud@v3.0.1
               with:
                 project_id: ${{ secrets.GCP_PROJECT_ID }}
+            - name: Set up Python 3.
+              uses: actions/setup-python@v6.1.0
+              with:
+                python-version: '3.12'
             - name: Enable caching
               uses: astral-sh/setup-uv@v7
               with:
