@@ -33,9 +33,13 @@ jobs:
               uses: google-github-actions/setup-gcloud@v3.0.1
               with:
                 project_id: ${{ secrets.GCP_PROJECT_ID }}
+            - name: Enable caching
+              uses: astral-sh/setup-uv@v7
+              with:
+                enable-cache: true
             - name: Install Dependencies
               run: |
-                python3 -m pip install junitparser==4.0.2
+                uv pip install --system junitparser==4.0.2
             - name: Copy JUnit reports from the last 24 hours from GCS
               run: |
                 BUCKET_NAME="${{ secrets[matrix.project.bucket_name] }}"
