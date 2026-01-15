@@ -16,7 +16,6 @@ This repository provides automation tools for:
 |----------|-------------|
 | `batch-crash-report` | Processes Android minidump crash reports from Firebase Test Lab, symbolicates them using Mozilla crash symbols, and sends Slack notifications |
 | `batch-ingest-allure` | Ingests JUnit XML reports from GCS into Allure for test result visualization |
-| `batch-ingest-report-portal` | Ingests JUnit XML reports from GCS into ReportPortal |
 | `batch-ingest-sheets` | Aggregates JUnit XML reports and uploads metrics to Google Sheets and BigQuery |
 | `tae-ingest-sheets` | Ingests Test Automation Engineering (TAE) statistics from Allure to Google Sheets |
 | `validate-staging-table` | Validates BigQuery staging table data |
