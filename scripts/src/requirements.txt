@@ -1,4 +1,4 @@
-cachetools==6.2.4
+cachetools==6.2.5
 certifi==2026.1.4
 charset-normalizer==3.4.4
 google-api-core==2.29.0
