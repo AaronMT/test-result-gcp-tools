@@ -13,7 +13,7 @@ jobs:
       BQ_DUMMY_TABLE: "dummy"
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v6.0.2
       - name: Authenticate with Google Cloud
         uses: google-github-actions/auth@v3.0.0
         with:
