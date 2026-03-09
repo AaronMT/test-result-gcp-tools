@@ -116,37 +116,53 @@ def append_daily_per_test_issues_only(
             idx for idx, row in enumerate(values[1:], start=2)
             if len(row) >= 2 and row[0] == run_date and row[1] == project_name
         ]
-        # Delete in smaller chunks to reduce API load
         if to_delete_today:
-            chunk_size = 5  # Reduced from 10
-            for i in range(0, len(to_delete_today), chunk_size):
-                chunk = to_delete_today[i:i + chunk_size]
-                for r in reversed(chunk):
-                    with_retries(lambda: ws.delete_rows(r))
-                time.sleep(3)  # Increased pause after each chunk
+            total_data_rows = len(values) - 1  # exclude header
+            if len(to_delete_today) >= total_data_rows:
+                # Can't delete all rows — clear contents instead
+                last_row = len(values)
+                print(f"Would delete all {total_data_rows} data rows (dupe check). Using batch_clear instead.")
+                with_retries(lambda: ws.batch_clear([f"A2:G{last_row}"]))
+                time.sleep(3)
+            else:
+                chunk_size = 5
+                for i in range(0, len(to_delete_today), chunk_size):
+                    chunk = to_delete_today[i:i + chunk_size]
+                    for r in reversed(chunk):
+                        with_retries(lambda: ws.delete_rows(r))
+                    time.sleep(3)
 
     # Longer pause before next read operation
     time.sleep(3)
 
     # 2) Prune rows older than the 7-day window
-    if len(values) > 1:
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=keep_days)).strftime("%Y-%m-%d")
-        values_after_dupe_check = with_retries(ws.get_all_values)  # after dupe deletion
-        time.sleep(2)  # Brief pause after read
-        values_after_dupe_check = values_after_dupe_check[1:]  # skip header
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=keep_days)).strftime("%Y-%m-%d")
+    values_after_dupe_check = with_retries(ws.get_all_values)
+    time.sleep(2)
+    data_rows = values_after_dupe_check[1:]  # skip header
 
+    # Only prune if there are real (non-empty) data rows
+    has_real_data = any(row[0].strip() for row in data_rows if row)
+    if len(values_after_dupe_check) > 1 and has_real_data:
         to_delete_old = [
-            idx for idx, row in enumerate(values_after_dupe_check, start=2)
+            idx for idx, row in enumerate(data_rows, start=2)
             if len(row) >= 1 and row[0] < cutoff
         ]
-        # Delete in smaller chunks
         if to_delete_old:
-            chunk_size = 5  # Reduced from 10
-            for i in range(0, len(to_delete_old), chunk_size):
-                chunk = to_delete_old[i:i + chunk_size]
-                for r in reversed(chunk):
-                    with_retries(lambda: ws.delete_rows(r))
-                time.sleep(3)  # Increased pause after each chunk
+            total_data_rows = len(data_rows)
+            if len(to_delete_old) >= total_data_rows:
+                # Can't delete all rows — clear contents instead
+                last_row = len(values_after_dupe_check)
+                print(f"Would delete all {total_data_rows} data rows (old row prune). Using batch_clear instead.")
+                with_retries(lambda: ws.batch_clear([f"A2:G{last_row}"]))
+                time.sleep(3)
+            else:
+                chunk_size = 5
+                for i in range(0, len(to_delete_old), chunk_size):
+                    chunk = to_delete_old[i:i + chunk_size]
+                    for r in reversed(chunk):
+                        with_retries(lambda: ws.delete_rows(r))
+                    time.sleep(3)
 
     # Longer pause before append operation
     time.sleep(3)
@@ -466,7 +482,7 @@ def update_daily_totals_sheet(client, daily_totals, sheet_name, project_name):
         target_row = last_data_row + 1
     
     # Update the target row using range notation
-    with_retries(lambda: sheet.update(f"A{target_row}:G{target_row}", [row_data], value_input_option="USER_ENTERED"))
+    with_retries(lambda: sheet.update(range_name=f"A{target_row}:G{target_row}", values=[row_data], value_input_option="USER_ENTERED"))
     time.sleep(2)
 
 
