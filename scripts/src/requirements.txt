@@ -2,7 +2,7 @@ cachetools==7.1.4
 certifi==2026.5.20
 charset-normalizer==3.4.7
 google-api-core==2.31.0
-google-auth==2.53.0
+google-auth==2.55.2
 google-cloud-core==2.6.0
 google-cloud-storage==3.11.0
 google-crc32c==1.8.0
